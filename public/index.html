@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Gym Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Home Screen -->
+    <div id="home-screen" class="screen active">
+      <header>
+        <h1>Gym Tracker</h1>
+      </header>
+      <main>
+        <section id="active-session-banner" class="hidden">
+          <p>Active session in progress</p>
+          <button onclick="app.resumeSession()">Resume</button>
+        </section>
+        <div id="home-content" class="loading">
+          <section id="stats-container"></section>
+          <section>
+            <h2>Start Workout</h2>
+            <div id="day-buttons"></div>
+          </section>
+          <nav class="bottom-nav">
+            <button onclick="app.showHistory()">History</button>
+            <button onclick="app.showProgress()">Progress</button>
+            <button onclick="app.showMeasurements()">Body</button>
+            <button onclick="app.showManage()">Manage</button>
+          </nav>
+        </div>
+      </main>
+    </div>
+
+    <!-- Session Screen -->
+    <div id="session-screen" class="screen">
+      <header>
+        <button class="back-btn" onclick="app.confirmEndSession()">End</button>
+        <h1 id="session-day-name">Workout</h1>
+        <button class="rest-btn" onclick="app.showRestTimer()">Rest</button>
+        <span id="session-timer">00:00:00</span>
+      </header>
+      <main>
+        <div id="exercise-list"></div>
+        <button id="finish-session-btn" onclick="app.finishSession()">Finish Session</button>
+        <button id="cancel-session-btn" onclick="app.cancelSession()">Cancel Session</button>
+      </main>
+    </div>
+
+    <!-- History Screen -->
+    <div id="history-screen" class="screen">
+      <header>
+        <button class="back-btn" onclick="app.goBack()">Back</button>
+        <h1>History</h1>
+      </header>
+      <main>
+        <div id="session-history"></div>
+      </main>
+    </div>
+
+    <!-- Session Detail Screen -->
+    <div id="session-detail-screen" class="screen">
+      <header>
+        <button class="back-btn" onclick="app.goBack()">Back</button>
+        <h1 id="detail-session-title">Session</h1>
+        <button class="delete-btn-header" onclick="app.deleteSession()">Delete</button>
+      </header>
+      <main>
+        <div id="session-detail-content"></div>
+      </main>
+    </div>
+
+    <!-- Progress Screen -->
+    <div id="progress-screen" class="screen">
+      <header>
+        <button class="back-btn" onclick="app.goBack()">Back</button>
+        <h1>Progress</h1>
+      </header>
+      <main>
+        <select id="progress-day-select" onchange="app.loadDayProgress()">
+          <option value="">Select workout day...</option>
+        </select>
+        <div id="progress-charts"></div>
+      </main>
+    </div>
+
+    <!-- Manage Screen -->
+    <div id="manage-screen" class="screen">
+      <header>
+        <button class="back-btn" onclick="app.goBack()">Back</button>
+        <h1>Manage</h1>
+      </header>
+      <main>
+        <select id="manage-day-select" onchange="app.loadDayExercises()">
+          <option value="">Select workout day...</option>
+        </select>
+        <div id="manage-exercise-list"></div>
+        <button id="add-exercise-btn" class="hidden" onclick="app.showAddExercise()">+ Add Exercise</button>
+      </main>
+    </div>
+
+    <!-- Measurements Screen -->
+    <div id="measurements-screen" class="screen">
+      <header>
+        <button class="back-btn" onclick="app.goBack()">Back</button>
+        <h1>Body Measurements</h1>
+      </header>
+      <main>
+        <div id="measurements-summary"></div>
+        <button id="add-measurement-btn" onclick="app.showAddMeasurement()">+ Add Measurement</button>
+        <div id="measurements-charts"></div>
+        <div id="measurements-history"></div>
+      </main>
+    </div>
+
+    <!-- Measurement Detail Screen -->
+    <div id="measurement-detail-screen" class="screen">
+      <header>
+        <button class="back-btn" onclick="app.goBack()">Back</button>
+        <h1 id="measurement-detail-title">Measurement</h1>
+        <button class="delete-btn-header" onclick="app.deleteMeasurement()">Delete</button>
+      </header>
+      <main>
+        <div id="measurement-detail-content"></div>
+      </main>
+    </div>
+
+    <!-- Add/Edit Measurement Modal -->
+    <div id="measurement-modal" class="modal hidden">
+      <div class="modal-content measurement-modal-content">
+        <h2 id="measurement-modal-title">Add Measurement</h2>
+        <form id="measurement-form" onsubmit="app.saveMeasurement(event)">
+          <input type="hidden" id="measurement-id">
+          <div id="measurement-form-fields"></div>
+          <label class="measurement-notes">
+            <span>Notes</span>
+            <textarea id="measurement-notes" rows="2"></textarea>
+          </label>
+          <div class="modal-actions">
+            <button type="button" onclick="app.closeMeasurementModal()">Cancel</button>
+            <button type="submit">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add/Edit Exercise Modal -->
+    <div id="exercise-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2 id="modal-title">Add Exercise</h2>
+        <form id="exercise-form" onsubmit="app.saveExercise(event)">
+          <input type="hidden" id="exercise-id">
+          <input type="hidden" id="exercise-day-id">
+          <label>
+            Name
+            <input type="text" id="exercise-name" required>
+          </label>
+          <label>
+            Default Weight (kg)
+            <input type="number" id="exercise-weight" step="0.5">
+          </label>
+
+          <div class="set-builder">
+            <label>Sets</label>
+            <div id="set-groups"></div>
+            <button type="button" class="add-set-group-btn" onclick="app.addSetGroup()">+ Add Set Group</button>
+          </div>
+
+          <div class="description-preview">
+            <label>Preview</label>
+            <div id="description-preview-text"></div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" onclick="app.closeModal()">Cancel</button>
+            <button type="submit">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Set Input Modal (Simplified) -->
+    <div id="set-modal" class="modal hidden">
+      <div class="modal-content">
+        <div id="set-exercise-name" class="modal-subtitle"></div>
+        <h2 id="set-number">Set 1</h2>
+        <form id="set-form" onsubmit="app.saveSet(event)">
+          <input type="hidden" id="set-exercise-id">
+          <input type="hidden" id="set-set-number">
+          <label>
+            Weight (kg)
+            <input type="number" id="set-weight" step="0.5" inputmode="decimal">
+          </label>
+          <label id="reps-row">
+            Reps
+            <input type="number" id="set-reps" inputmode="numeric">
+          </label>
+          <div class="modal-actions">
+            <button type="button" onclick="app.closeSetModal()">Cancel</button>
+            <button type="submit">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Rest Timer Modal -->
+    <div id="rest-timer-modal" class="modal hidden">
+      <div class="modal-content rest-timer-content">
+        <div id="rest-timer-select" class="rest-timer-select">
+          <h2>Rest Timer</h2>
+          <div class="rest-timer-options">
+            <button type="button" onclick="app.startRestTimer(60)">1:00</button>
+            <button type="button" onclick="app.startRestTimer(90)">1:30</button>
+            <button type="button" onclick="app.startRestTimer(120)">2:00</button>
+            <button type="button" onclick="app.startRestTimer(180)">3:00</button>
+          </div>
+          <div class="rest-timer-custom">
+            <input type="number" id="custom-rest-seconds" placeholder="seconds" min="10" max="600">
+            <button type="button" onclick="app.startCustomRestTimer()">Start</button>
+          </div>
+          <button type="button" class="rest-timer-cancel" onclick="app.closeRestTimer()">Cancel</button>
+        </div>
+        <div id="rest-timer-countdown" class="rest-timer-countdown hidden">
+          <div id="rest-timer-display">0:00</div>
+          <div class="rest-timer-extend">
+            <button type="button" onclick="app.extendRestTimer(10)">+10s</button>
+            <button type="button" onclick="app.extendRestTimer(30)">+30s</button>
+            <button type="button" onclick="app.extendRestTimer(60)">+1m</button>
+          </div>
+          <button type="button" class="rest-timer-stop" onclick="app.closeRestTimer()">Stop</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Set Modal (for history) -->
+    <div id="edit-set-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Edit Set</h2>
+        <form id="edit-set-form" onsubmit="app.updateSet(event)">
+          <input type="hidden" id="edit-set-id">
+          <input type="hidden" id="edit-session-id">
+          <label>
+            Weight (kg)
+            <input type="number" id="edit-set-weight" step="0.5" inputmode="decimal">
+          </label>
+          <label>
+            Reps
+            <input type="number" id="edit-set-reps" inputmode="numeric">
+          </label>
+          <div class="modal-actions">
+            <button type="button" onclick="app.closeEditSetModal()">Cancel</button>
+            <button type="button" class="delete-btn" onclick="app.deleteSet()">Delete</button>
+            <button type="submit">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Weekly Goal Modal -->
+    <div id="weekly-goal-modal" class="modal hidden">
+      <div class="modal-content" id="weekly-goal-content"></div>
+    </div>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

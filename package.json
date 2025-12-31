@@ -1,0 +1,25 @@
+{
+  "name": "gym-tracker",
+  "version": "1.0.0",
+  "description": "Mobile-first gym workout tracker",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "seed": "tsx src/seed.ts",
+    "build:frontend": "esbuild public/app.ts --bundle --outfile=public/app.js --minify"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.6.0",
+    "express": "^4.21.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
