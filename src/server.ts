@@ -1,6 +1,8 @@
 import express from 'express';
+import morgan from 'morgan';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { statSync } from 'fs';
 import {
   initializeDatabase,
   getAllDays,
@@ -34,7 +36,8 @@ import {
   deleteMeasurement,
   getSummaryStats,
   getWeeklyGoal,
-  setWeeklyGoal
+  setWeeklyGoal,
+  db
 } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,6 +46,7 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.static(join(__dirname, '..', 'public')));
 
@@ -267,6 +271,37 @@ app.put('/api/stats/weekly-goal', (req, res) => {
   }
   setWeeklyGoal(goal);
   res.json({ goal: getWeeklyGoal() });
+});
+
+// Admin/Debug endpoints
+app.get('/api/admin/db-stats', (_req, res) => {
+  const dbPath = process.env.DATABASE_PATH || join(__dirname, '..', 'gym.db');
+
+  try {
+    const stats = statSync(dbPath);
+    const tableStats = db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM workout_days) as workout_days,
+        (SELECT COUNT(*) FROM exercises) as exercises,
+        (SELECT COUNT(*) FROM sessions) as sessions,
+        (SELECT COUNT(*) FROM session_exercises) as session_exercises,
+        (SELECT COUNT(*) FROM set_logs) as set_logs,
+        (SELECT COUNT(*) FROM body_measurements) as measurements
+    `).get() as Record<string, number>;
+
+    res.json({
+      file: {
+        path: dbPath,
+        sizeBytes: stats.size,
+        sizeMB: (stats.size / 1024 / 1024).toFixed(2),
+        lastModified: stats.mtime
+      },
+      tables: tableStats,
+      status: 'healthy'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get DB stats', details: String(error) });
+  }
 });
 
 // SPA fallback - serve index.html for all non-API routes
