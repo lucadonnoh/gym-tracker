@@ -48,6 +48,24 @@ const PORT = process.env.PORT || 3000;
 
 app.use(morgan('combined'));
 app.use(express.json());
+
+// Serve index.html with analytics injection
+const umamiUrl = process.env.UMAMI_URL;
+const umamiWebsiteId = process.env.UMAMI_WEBSITE_ID;
+
+app.get('/', (_req, res) => {
+  const indexPath = join(__dirname, '..', 'public', 'index.html');
+  if (umamiUrl && umamiWebsiteId) {
+    const { readFileSync } = require('fs');
+    let html = readFileSync(indexPath, 'utf8');
+    const analyticsScript = `<script defer src="${umamiUrl}/script.js" data-website-id="${umamiWebsiteId}"></script>`;
+    html = html.replace('</head>', `${analyticsScript}\n</head>`);
+    res.send(html);
+  } else {
+    res.sendFile(indexPath);
+  }
+});
+
 app.use(express.static(join(__dirname, '..', 'public')));
 
 // Initialize database
@@ -307,14 +325,9 @@ app.get('/api/admin/db-stats', (_req, res) => {
 // SPA fallback - serve index.html for all non-API routes
 app.get('*', (_req, res) => {
   const indexPath = join(__dirname, '..', 'public', 'index.html');
-
-  // Inject analytics if configured
-  const umamiUrl = process.env.UMAMI_URL;
-  const umamiWebsiteId = process.env.UMAMI_WEBSITE_ID;
-
   if (umamiUrl && umamiWebsiteId) {
-    const fs = require('fs');
-    let html = fs.readFileSync(indexPath, 'utf8');
+    const { readFileSync } = require('fs');
+    let html = readFileSync(indexPath, 'utf8');
     const analyticsScript = `<script defer src="${umamiUrl}/script.js" data-website-id="${umamiWebsiteId}"></script>`;
     html = html.replace('</head>', `${analyticsScript}\n</head>`);
     res.send(html);
