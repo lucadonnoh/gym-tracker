@@ -2,7 +2,7 @@ import express from 'express';
 import morgan from 'morgan';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { statSync } from 'fs';
+import { statSync, readFileSync } from 'fs';
 import {
   initializeDatabase,
   getAllDays,
@@ -56,11 +56,10 @@ const umamiWebsiteId = process.env.UMAMI_WEBSITE_ID;
 app.get('/', (_req, res) => {
   const indexPath = join(__dirname, '..', 'public', 'index.html');
   if (umamiUrl && umamiWebsiteId) {
-    const { readFileSync } = require('fs');
-    let html = readFileSync(indexPath, 'utf8');
+    const html = readFileSync(indexPath, 'utf8');
     const analyticsScript = `<script defer src="${umamiUrl}/script.js" data-website-id="${umamiWebsiteId}"></script>`;
-    html = html.replace('</head>', `${analyticsScript}\n</head>`);
-    res.send(html);
+    const injectedHtml = html.replace('</head>', `${analyticsScript}\n</head>`);
+    res.send(injectedHtml);
   } else {
     res.sendFile(indexPath);
   }
@@ -326,11 +325,10 @@ app.get('/api/admin/db-stats', (_req, res) => {
 app.get('*', (_req, res) => {
   const indexPath = join(__dirname, '..', 'public', 'index.html');
   if (umamiUrl && umamiWebsiteId) {
-    const { readFileSync } = require('fs');
-    let html = readFileSync(indexPath, 'utf8');
+    const html = readFileSync(indexPath, 'utf8');
     const analyticsScript = `<script defer src="${umamiUrl}/script.js" data-website-id="${umamiWebsiteId}"></script>`;
-    html = html.replace('</head>', `${analyticsScript}\n</head>`);
-    res.send(html);
+    const injectedHtml = html.replace('</head>', `${analyticsScript}\n</head>`);
+    res.send(injectedHtml);
   } else {
     res.sendFile(indexPath);
   }
