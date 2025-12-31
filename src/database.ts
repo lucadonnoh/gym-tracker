@@ -5,7 +5,7 @@ import type { WorkoutDay, Exercise, Session, SessionExercise, SetLog, SessionWit
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const dbPath = join(__dirname, '..', 'gym.db');
+const dbPath = process.env.DATABASE_PATH || join(__dirname, '..', 'gym.db');
 
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
