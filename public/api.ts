@@ -9,40 +9,125 @@ import type {
   ExerciseStats,
   SetLog,
   BodyMeasurement,
-  SummaryStats
+  SummaryStats,
+  User
 } from './types.js';
 
+const TOKEN_KEY = 'gym_tracker_token';
+
 class Api {
-  private async get<T>(url: string): Promise<T> {
-    const res = await fetch(url);
-    return res.json();
+  private token: string | null = null;
+  private onAuthError: (() => void) | null = null;
+
+  constructor() {
+    this.token = localStorage.getItem(TOKEN_KEY);
   }
 
-  private async post<T>(url: string, body: object): Promise<T> {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    return res.json();
+  setAuthErrorHandler(handler: () => void): void {
+    this.onAuthError = handler;
   }
 
-  private async put<T>(url: string, body: object = {}): Promise<T> {
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    // Handle 204 No Content responses
+  isAuthenticated(): boolean {
+    return this.token !== null;
+  }
+
+  getToken(): string | null {
+    return this.token;
+  }
+
+  private setToken(token: string | null): void {
+    this.token = token;
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  }
+
+  private getHeaders(): HeadersInit {
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    return headers;
+  }
+
+  private async handleResponse<T>(res: Response): Promise<T> {
+    if (res.status === 401) {
+      this.setToken(null);
+      if (this.onAuthError) {
+        this.onAuthError();
+      }
+      throw new Error('Unauthorized');
+    }
     if (res.status === 204) {
       return undefined as T;
     }
     return res.json();
   }
 
+  private async get<T>(url: string): Promise<T> {
+    const res = await fetch(url, { headers: this.getHeaders() });
+    return this.handleResponse<T>(res);
+  }
+
+  private async post<T>(url: string, body: object): Promise<T> {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body)
+    });
+    return this.handleResponse<T>(res);
+  }
+
+  private async put<T>(url: string, body: object = {}): Promise<T> {
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body)
+    });
+    return this.handleResponse<T>(res);
+  }
+
   private async delete(url: string): Promise<boolean> {
-    const res = await fetch(url, { method: 'DELETE' });
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: this.getHeaders()
+    });
+    if (res.status === 401) {
+      this.setToken(null);
+      if (this.onAuthError) {
+        this.onAuthError();
+      }
+      throw new Error('Unauthorized');
+    }
     return res.ok;
+  }
+
+  // Auth
+  async login(username: string, password: string): Promise<{ token: string; user: User } | { error: string }> {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (data.token) {
+      this.setToken(data.token);
+    }
+    return data;
+  }
+
+  async logout(): void {
+    this.setToken(null);
+  }
+
+  async getMe(): Promise<User> {
+    return this.get('/api/auth/me');
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string } | { error: string }> {
+    return this.put('/api/auth/password', { currentPassword, newPassword });
   }
 
   // Days
@@ -107,10 +192,10 @@ class Api {
   async createSession(dayId: number): Promise<Session | { error: string; activeSession?: Session }> {
     const res = await fetch('/api/sessions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.getHeaders(),
       body: JSON.stringify({ day_id: dayId })
     });
-    return res.json();
+    return this.handleResponse(res);
   }
 
   async endSession(id: number, notes?: string): Promise<Session> {

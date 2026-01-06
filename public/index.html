@@ -16,10 +16,32 @@
 </head>
 <body>
   <div id="app">
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+      <main class="login-main">
+        <div class="login-container">
+          <h1 class="login-title">Gym Tracker</h1>
+          <form id="login-form" onsubmit="app.login(event)">
+            <label>
+              Username
+              <input type="text" id="login-username" required autocomplete="username">
+            </label>
+            <label>
+              Password
+              <input type="password" id="login-password" required autocomplete="current-password">
+            </label>
+            <div id="login-error" class="login-error hidden"></div>
+            <button type="submit" id="login-submit">Login</button>
+          </form>
+        </div>
+      </main>
+    </div>
+
     <!-- Home Screen -->
-    <div id="home-screen" class="screen active">
+    <div id="home-screen" class="screen">
       <header>
         <h1>Gym Tracker</h1>
+        <button class="settings-btn" onclick="app.showSettings()">⚙</button>
       </header>
       <main>
         <section id="active-session-banner" class="hidden">
@@ -269,6 +291,41 @@
     <!-- Weekly Goal Modal -->
     <div id="weekly-goal-modal" class="modal hidden">
       <div class="modal-content" id="weekly-goal-content"></div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content settings-modal-content">
+        <h2>Settings</h2>
+        <div class="settings-user">
+          <span>Logged in as:</span>
+          <span id="settings-username"></span>
+        </div>
+        <div class="settings-section">
+          <h3>Change Password</h3>
+          <form id="password-form" onsubmit="app.changePassword(event)">
+            <label>
+              Current Password
+              <input type="password" id="current-password" required autocomplete="current-password">
+            </label>
+            <label>
+              New Password
+              <input type="password" id="new-password" required autocomplete="new-password">
+            </label>
+            <label>
+              Confirm New Password
+              <input type="password" id="confirm-password" required autocomplete="new-password">
+            </label>
+            <div id="password-error" class="password-error hidden"></div>
+            <div id="password-success" class="password-success hidden"></div>
+            <button type="submit">Update Password</button>
+          </form>
+        </div>
+        <div class="settings-actions">
+          <button type="button" class="logout-btn" onclick="app.logout()">Logout</button>
+          <button type="button" onclick="app.closeSettings()">Close</button>
+        </div>
+      </div>
     </div>
   </div>
   <script type="module" src="app.js"></script>

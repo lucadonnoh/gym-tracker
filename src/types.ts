@@ -68,3 +68,9 @@ export interface BodyMeasurement {
   neck: number | null;
   notes: string | null;
 }
+
+export interface User {
+  id: number;
+  username: string;
+  created_at: string;
+}

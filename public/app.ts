@@ -12,7 +12,8 @@ import type {
   SetGroup,
   BodyMeasurement,
   MeasurementFieldConfig,
-  SummaryStats
+  SummaryStats,
+  User
 } from './types.js';
 import { MEASUREMENT_FIELDS } from './types.js';
 
@@ -20,6 +21,7 @@ declare const Chart: any;
 
 class GymTrackerApp {
   // State
+  private currentUser: User | null = null;
   private days: WorkoutDay[] = [];
   private currentSession: Session | null = null;
   private sessionStartTime: Date | null = null;
@@ -81,12 +83,20 @@ class GymTrackerApp {
   private get $measurementDetailContent() { return document.getElementById('measurement-detail-content'); }
   private get $measurementModal() { return document.getElementById('measurement-modal'); }
   private get $measurementFormFields() { return document.getElementById('measurement-form-fields'); }
+  private get $settingsModal() { return document.getElementById('settings-modal'); }
+  private get $loginScreen() { return document.getElementById('login-screen'); }
 
   constructor() {
     // Disable browser's automatic scroll restoration
     if ('scrollRestoration' in history) {
       history.scrollRestoration = 'manual';
     }
+
+    // Set up auth error handler - redirect to login on 401
+    api.setAuthErrorHandler(() => {
+      this.currentUser = null;
+      this.showLoginScreen();
+    });
 
     // Handle browser back/forward buttons
     window.addEventListener('popstate', (event) => {
@@ -101,6 +111,20 @@ class GymTrackerApp {
   }
 
   private async init(): Promise<void> {
+    // Check authentication first
+    if (!api.isAuthenticated()) {
+      this.showLoginScreen();
+      return;
+    }
+
+    // Verify token is still valid
+    try {
+      this.currentUser = await api.getMe();
+    } catch {
+      this.showLoginScreen();
+      return;
+    }
+
     // Load all data in parallel
     const [days, activeSession, stats] = await Promise.all([
       api.getDays(),
@@ -126,7 +150,8 @@ class GymTrackerApp {
     await new Promise(resolve => requestAnimationFrame(resolve));
     document.getElementById('home-content')?.classList.remove('loading');
 
-    // Handle initial route
+    // Show home screen and handle initial route
+    this.$loginScreen?.classList.remove('active');
     await this.handleRoute(window.location.pathname, true);
   }
 
@@ -817,6 +842,168 @@ class GymTrackerApp {
 
   closeWeeklyGoalModal(): void {
     this.$weeklyGoalModal?.classList.add('hidden');
+  }
+
+  // ===================
+  // Authentication
+  // ===================
+
+  private showLoginScreen(): void {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    this.$loginScreen?.classList.add('active');
+  }
+
+  async login(event: Event): Promise<void> {
+    event.preventDefault();
+
+    const usernameInput = document.getElementById('login-username') as HTMLInputElement;
+    const passwordInput = document.getElementById('login-password') as HTMLInputElement;
+    const errorDiv = document.getElementById('login-error');
+    const submitBtn = document.getElementById('login-submit') as HTMLButtonElement;
+
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!username || !password) return;
+
+    submitBtn.disabled = true;
+    errorDiv?.classList.add('hidden');
+
+    try {
+      const result = await api.login(username, password);
+
+      if ('error' in result) {
+        if (errorDiv) {
+          errorDiv.textContent = result.error;
+          errorDiv.classList.remove('hidden');
+        }
+        submitBtn.disabled = false;
+        return;
+      }
+
+      this.currentUser = result.user;
+      passwordInput.value = '';
+      await this.initAfterLogin();
+    } catch (err) {
+      if (errorDiv) {
+        errorDiv.textContent = 'Login failed. Please try again.';
+        errorDiv.classList.remove('hidden');
+      }
+      submitBtn.disabled = false;
+    }
+  }
+
+  private async initAfterLogin(): Promise<void> {
+    // Load all data
+    const [days, activeSession, stats] = await Promise.all([
+      api.getDays(),
+      api.getActiveSession(),
+      api.getSummaryStats()
+    ]);
+
+    this.days = days;
+
+    if (activeSession) {
+      this.currentSession = activeSession;
+      this.$activeSessionBanner?.classList.remove('hidden');
+    }
+
+    this.renderDayButtons();
+    if (this.$statsContainer) {
+      this.$statsContainer.innerHTML = templates.renderSummaryStats(stats);
+    }
+
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    document.getElementById('home-content')?.classList.remove('loading');
+
+    this.$loginScreen?.classList.remove('active');
+    this.showScreen('home-screen', false);
+    this.updateUrl('home-screen');
+  }
+
+  async logout(): Promise<void> {
+    await api.logout();
+    this.currentUser = null;
+    this.currentSession = null;
+    this.days = [];
+    this.closeSettings();
+    this.showLoginScreen();
+  }
+
+  showSettings(): void {
+    const usernameEl = document.getElementById('settings-username');
+    if (usernameEl && this.currentUser) {
+      usernameEl.textContent = this.currentUser.username;
+    }
+
+    // Clear form
+    (document.getElementById('current-password') as HTMLInputElement).value = '';
+    (document.getElementById('new-password') as HTMLInputElement).value = '';
+    (document.getElementById('confirm-password') as HTMLInputElement).value = '';
+    document.getElementById('password-error')?.classList.add('hidden');
+    document.getElementById('password-success')?.classList.add('hidden');
+
+    this.$settingsModal?.classList.remove('hidden');
+  }
+
+  closeSettings(): void {
+    this.$settingsModal?.classList.add('hidden');
+  }
+
+  async changePassword(event: Event): Promise<void> {
+    event.preventDefault();
+
+    const currentPassword = (document.getElementById('current-password') as HTMLInputElement).value;
+    const newPassword = (document.getElementById('new-password') as HTMLInputElement).value;
+    const confirmPassword = (document.getElementById('confirm-password') as HTMLInputElement).value;
+    const errorDiv = document.getElementById('password-error');
+    const successDiv = document.getElementById('password-success');
+
+    errorDiv?.classList.add('hidden');
+    successDiv?.classList.add('hidden');
+
+    if (newPassword !== confirmPassword) {
+      if (errorDiv) {
+        errorDiv.textContent = 'New passwords do not match';
+        errorDiv.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      if (errorDiv) {
+        errorDiv.textContent = 'Password must be at least 4 characters';
+        errorDiv.classList.remove('hidden');
+      }
+      return;
+    }
+
+    try {
+      const result = await api.changePassword(currentPassword, newPassword);
+
+      if ('error' in result) {
+        if (errorDiv) {
+          errorDiv.textContent = result.error;
+          errorDiv.classList.remove('hidden');
+        }
+        return;
+      }
+
+      // Success
+      (document.getElementById('current-password') as HTMLInputElement).value = '';
+      (document.getElementById('new-password') as HTMLInputElement).value = '';
+      (document.getElementById('confirm-password') as HTMLInputElement).value = '';
+
+      if (successDiv) {
+        successDiv.textContent = 'Password updated successfully';
+        successDiv.classList.remove('hidden');
+      }
+    } catch (err) {
+      if (errorDiv) {
+        errorDiv.textContent = 'Failed to change password';
+        errorDiv.classList.remove('hidden');
+      }
+    }
   }
 
   // ===================

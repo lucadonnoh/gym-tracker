@@ -1800,3 +1800,257 @@ h2 {
 canvas {
   filter: brightness(1);
 }
+
+/* ============================================
+   Login Screen
+   ============================================ */
+.login-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-lg);
+}
+
+.login-container {
+  width: 100%;
+  max-width: 320px;
+}
+
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: var(--space-xl);
+  letter-spacing: -0.02em;
+}
+
+#login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+#login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+#login-form input {
+  padding: 0.875rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 1rem;
+}
+
+#login-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#login-submit {
+  margin-top: var(--space-md);
+  padding: 1rem;
+  background: var(--accent);
+  color: var(--black);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+#login-submit:active {
+  background: var(--accent-dim);
+}
+
+#login-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-error {
+  padding: 0.75rem;
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* ============================================
+   Settings Modal
+   ============================================ */
+.settings-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.settings-btn:active {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.settings-modal-content {
+  max-width: 320px;
+}
+
+.settings-user {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-md);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+  font-size: 0.9375rem;
+}
+
+.settings-user span:first-child {
+  color: var(--text-muted);
+}
+
+.settings-user span:last-child {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.settings-section {
+  margin-bottom: var(--space-lg);
+}
+
+.settings-section h3 {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: var(--space-md);
+}
+
+#password-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+#password-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+#password-form input {
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 1rem;
+}
+
+#password-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#password-form button {
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--accent-dim);
+  color: var(--accent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+#password-form button:active {
+  background: var(--accent-dim);
+}
+
+.password-error {
+  padding: 0.75rem;
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.password-success {
+  padding: 0.75rem;
+  background: var(--accent-surface);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius-md);
+  color: var(--accent);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 0.875rem;
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.logout-btn:active {
+  background: var(--danger);
+  color: white;
+}
+
+.settings-actions button:last-child {
+  width: 100%;
+  padding: 0.875rem;
+  background: var(--black);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.settings-actions button:last-child:active {
+  background: var(--surface);
+}

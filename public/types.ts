@@ -135,6 +135,12 @@ export const MEASUREMENT_FIELDS: MeasurementFieldConfig[] = [
   { key: 'right_calf', label: 'Right Calf', unit: 'cm', color: '#455A64', section: 'lower' },
 ];
 
+export interface User {
+  id: number;
+  username: string;
+  created_at: string;
+}
+
 // DOM element refs that we cache
 export interface DOMRefs {
   // Home screen
