@@ -141,25 +141,25 @@ function renderSetRow(exercise, expected, logged, lastSets) {
   const placeholderReps = lastSet?.reps?.toString() || "reps";
   const confirmWeight = lastSet?.weight || exercise.default_weight || 0;
   const confirmReps = isMax ? lastSet?.reps || null : expected.reps;
+  const showReps = isLogged ? reps : isMax ? "" : expected.reps;
+  const repsPlaceholder = isMax ? placeholderReps : expected.reps;
   return `
     <div class="set-row ${isLogged ? "logged" : ""}" data-exercise="${exercise.id}" data-set="${expected.setNumber}">
       <span class="set-label">Set ${expected.setNumber}</span>
-      <span class="set-reps">${isMax ? "max" : expected.reps} reps</span>
-      ${isMax ? `
-        <input type="number" class="reps-input ${isLogged ? "filled" : ""}"
-          value="${isLogged ? reps : ""}"
-          inputmode="numeric"
-          placeholder="${placeholderReps}"
-          onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .weight-input').value, this.value)">
-      ` : ""}
+      <input type="number" class="reps-input ${isLogged ? "filled" : ""}"
+        value="${showReps}"
+        inputmode="numeric"
+        placeholder="${repsPlaceholder}"
+        onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .weight-input').value, this.value)">
+      <span class="reps-unit">reps</span>
       <input type="number" class="weight-input ${isLogged ? "filled" : ""}"
         value="${showValue}"
         step="0.5"
         inputmode="decimal"
         placeholder="${placeholderWeight}"
-        onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, this.value, ${isMax ? `document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .reps-input').value` : expected.reps})">
+        onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, this.value, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .reps-input').value)">
       <span class="weight-unit">kg</span>
-      ${!isLogged ? `<button class="confirm-btn" onclick="app.confirmSet(${exercise.id}, ${expected.setNumber}, ${confirmWeight}, ${confirmReps})">\u2713</button>` : ""}
+      ${!isLogged ? `<button class="confirm-btn" onclick="app.confirmSet(${exercise.id}, ${expected.setNumber}, ${confirmWeight}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .reps-input').value || ${confirmReps})">\u2713</button>` : ""}
     </div>
   `;
 }

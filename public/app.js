@@ -3,7 +3,7 @@
       <span class="day-name">${n.display_name}</span>
       ${e?`<span class="day-last">${e}</span>`:""}
     </button>
-  `}function E(n){let e=new Date(n.started_at),t=n.ended_at?new Date(n.ended_at):null,s=t?B(t.getTime()-e.getTime()):"In progress";return`
+  `}function E(n){let e=new Date(n.started_at),t=n.ended_at?new Date(n.ended_at):null,s=t?P(t.getTime()-e.getTime()):"In progress";return`
     <div class="history-item" onclick="app.showSessionDetail(${n.id})">
       <div class="history-date">${e.toLocaleDateString()}</div>
       <div class="history-day">${n.day_display_name}</div>
@@ -64,27 +64,25 @@
       ${t?`<span class="volume-change ${t.startsWith("+")?"up":t.startsWith("-")?"down":""}">${t}</span>`:""}
       ${e?`<span class="volume-last">(last: ${e.toFixed(0)} kg)</span>`:""}
     </div>
-  `}function I(n,e,t,s){let i=t?.weight??n.default_weight??"",a=t?.reps??(typeof e.reps=="number"?e.reps:""),o=e.reps==="max",r=t&&t.weight!==null;if(e.isDropset&&e.dropsetParts)return C(n,e,s);let c=r?i:"",m=s.find(v=>v.set_number===e.setNumber),l=m?.weight?.toString()||n.default_weight?.toString()||"kg",p=m?.reps?.toString()||"reps",u=m?.weight||n.default_weight||0,h=o?m?.reps||null:e.reps;return`
+  `}function I(n,e,t,s){let i=t?.weight??n.default_weight??"",a=t?.reps??(typeof e.reps=="number"?e.reps:""),o=e.reps==="max",r=t&&t.weight!==null;if(e.isDropset&&e.dropsetParts)return H(n,e,s);let c=r?i:"",m=s.find(B=>B.set_number===e.setNumber),l=m?.weight?.toString()||n.default_weight?.toString()||"kg",p=m?.reps?.toString()||"reps",u=m?.weight||n.default_weight||0,h=o?m?.reps||null:e.reps,v=r?a:o?"":e.reps,C=o?p:e.reps;return`
     <div class="set-row ${r?"logged":""}" data-exercise="${n.id}" data-set="${e.setNumber}">
       <span class="set-label">Set ${e.setNumber}</span>
-      <span class="set-reps">${o?"max":e.reps} reps</span>
-      ${o?`
-        <input type="number" class="reps-input ${r?"filled":""}"
-          value="${r?a:""}"
-          inputmode="numeric"
-          placeholder="${p}"
-          onchange="app.logSetWeight(${n.id}, ${e.setNumber}, document.querySelector('[data-exercise=\\'${n.id}\\'][data-set=\\'${e.setNumber}\\'] .weight-input').value, this.value)">
-      `:""}
+      <input type="number" class="reps-input ${r?"filled":""}"
+        value="${v}"
+        inputmode="numeric"
+        placeholder="${C}"
+        onchange="app.logSetWeight(${n.id}, ${e.setNumber}, document.querySelector('[data-exercise=\\'${n.id}\\'][data-set=\\'${e.setNumber}\\'] .weight-input').value, this.value)">
+      <span class="reps-unit">reps</span>
       <input type="number" class="weight-input ${r?"filled":""}"
         value="${c}"
         step="0.5"
         inputmode="decimal"
         placeholder="${l}"
-        onchange="app.logSetWeight(${n.id}, ${e.setNumber}, this.value, ${o?`document.querySelector('[data-exercise=\\'${n.id}\\'][data-set=\\'${e.setNumber}\\'] .reps-input').value`:e.reps})">
+        onchange="app.logSetWeight(${n.id}, ${e.setNumber}, this.value, document.querySelector('[data-exercise=\\'${n.id}\\'][data-set=\\'${e.setNumber}\\'] .reps-input').value)">
       <span class="weight-unit">kg</span>
-      ${r?"":`<button class="confirm-btn" onclick="app.confirmSet(${n.id}, ${e.setNumber}, ${u}, ${h})">\u2713</button>`}
+      ${r?"":`<button class="confirm-btn" onclick="app.confirmSet(${n.id}, ${e.setNumber}, ${u}, document.querySelector('[data-exercise=\\'${n.id}\\'][data-set=\\'${e.setNumber}\\'] .reps-input').value || ${h})">\u2713</button>`}
     </div>
-  `}function C(n,e,t){let s=n.sets||[],i=[],a=typeof e.reps=="string"?e.reps.split("-").map(r=>parseInt(r)||10):[e.reps];for(let r=0;r<(e.dropsetParts||0);r++){let c=e.setNumber+r*.1,m=s.find(p=>Math.abs(p.set_number-c)<.01),l=t.find(p=>Math.abs(p.set_number-c)<.01);i.push({weight:m?.weight??"",logged:m?.weight!==null&&m?.weight!==void 0,placeholder:l?.weight?.toString()||"kg",reps:a[r]??a[0]??10})}return`
+  `}function H(n,e,t){let s=n.sets||[],i=[],a=typeof e.reps=="string"?e.reps.split("-").map(r=>parseInt(r)||10):[e.reps];for(let r=0;r<(e.dropsetParts||0);r++){let c=e.setNumber+r*.1,m=s.find(p=>Math.abs(p.set_number-c)<.01),l=t.find(p=>Math.abs(p.set_number-c)<.01);i.push({weight:m?.weight??"",logged:m?.weight!==null&&m?.weight!==void 0,placeholder:l?.weight?.toString()||"kg",reps:a[r]??a[0]??10})}return`
     <div class="set-row ${i.every(r=>r.logged)?"logged":""}" data-exercise="${n.id}" data-set="${e.setNumber}">
       <span class="set-label">Set ${e.setNumber}</span>
       <span class="set-reps">${e.reps}</span>
@@ -113,7 +111,7 @@
         onchange="app.logSetWeight(${n.id}, ${e.set_number}, this.value, ${e.reps||10})">
       <span class="weight-unit">kg</span>
     </div>
-  `}function B(n){let e=Math.floor(n/6e4),t=Math.floor(e/60),s=e%60;return t>0?`${t}h ${s}m`:`${s}m`}function D(n){let e=Math.floor(n/3600),t=Math.floor(n%3600/60),s=n%60;return`${e.toString().padStart(2,"0")}:${t.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`}function w(n){let e=n.currentWeekWorkouts.map(o=>o.dayOfWeek),t=e.length>=n.weeklyGoal,s=["M","T","W","T","F","S","S"],i=[6,0,1,2,3,4,5],a=s.map((o,r)=>{let c=[1,2,3,4,5,6,0][r],m=e.includes(c),l=new Date().getDay()===c;return`<div class="week-day ${m?"completed":""} ${l?"today":""}">${o}</div>`}).join("");return`
+  `}function P(n){let e=Math.floor(n/6e4),t=Math.floor(e/60),s=e%60;return t>0?`${t}h ${s}m`:`${s}m`}function D(n){let e=Math.floor(n/3600),t=Math.floor(n%3600/60),s=n%60;return`${e.toString().padStart(2,"0")}:${t.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`}function w(n){let e=n.currentWeekWorkouts.map(o=>o.dayOfWeek),t=e.length>=n.weeklyGoal,s=["M","T","W","T","F","S","S"],i=[6,0,1,2,3,4,5],a=s.map((o,r)=>{let c=[1,2,3,4,5,6,0][r],m=e.includes(c),l=new Date().getDay()===c;return`<div class="week-day ${m?"completed":""} ${l?"today":""}">${o}</div>`}).join("");return`
     <div class="summary-stats">
       <div class="stats-row">
         <div class="stat-box">
@@ -213,4 +211,4 @@
         `:""}
         <button type="button" class="remove-set-group" onclick="app.removeSetGroup(${s})">\xD7</button>
       </div>
-    `).join(""),this.updateDescriptionPreview())}addSetGroup(){this.setGroups.push({count:1,reps:10,isDropset:!1}),this.renderSetGroups()}removeSetGroup(e){this.setGroups.length<=1||(this.setGroups.splice(e,1),this.renderSetGroups())}updateSetGroup(e,t,s){let i=this.setGroups[e];if(i){switch(t){case"count":i.count=parseInt(s)||1;break;case"reps":i.reps=parseInt(s)||10;break;case"repsType":i.reps=s==="max"?"max":10;break;case"isDropset":i.isDropset=s,s&&!i.dropsetCount&&(i.dropsetCount=3);break;case"dropsetCount":i.dropsetCount=parseInt(s)||3;break}this.renderSetGroups()}}updateDescriptionPreview(){let e=document.getElementById("description-preview-text");e&&(e.textContent=this.generateDescription()||"No sets defined")}generateDescription(){return this.setGroups.map(e=>{let t;e.reps==="max"?t="max":e.isDropset&&e.dropsetCount?t=Array(e.dropsetCount).fill(e.reps).join("-"):t=e.reps.toString();let s=`${e.count}x${t}`;return e.note&&(s+=` (${e.note})`),s}).join(", ")}},P=new $;window.app=P;})();
+    `).join(""),this.updateDescriptionPreview())}addSetGroup(){this.setGroups.push({count:1,reps:10,isDropset:!1}),this.renderSetGroups()}removeSetGroup(e){this.setGroups.length<=1||(this.setGroups.splice(e,1),this.renderSetGroups())}updateSetGroup(e,t,s){let i=this.setGroups[e];if(i){switch(t){case"count":i.count=parseInt(s)||1;break;case"reps":i.reps=parseInt(s)||10;break;case"repsType":i.reps=s==="max"?"max":10;break;case"isDropset":i.isDropset=s,s&&!i.dropsetCount&&(i.dropsetCount=3);break;case"dropsetCount":i.dropsetCount=parseInt(s)||3;break}this.renderSetGroups()}}updateDescriptionPreview(){let e=document.getElementById("description-preview-text");e&&(e.textContent=this.generateDescription()||"No sets defined")}generateDescription(){return this.setGroups.map(e=>{let t;e.reps==="max"?t="max":e.isDropset&&e.dropsetCount?t=Array(e.dropsetCount).fill(e.reps).join("-"):t=e.reps.toString();let s=`${e.count}x${t}`;return e.note&&(s+=` (${e.note})`),s}).join(", ")}},_=new $;window.app=_;})();

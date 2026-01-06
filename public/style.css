@@ -460,7 +460,7 @@ h2 {
 }
 
 .reps-input {
-  width: 54px;
+  width: 48px;
 }
 
 .confirm-btn {
@@ -486,7 +486,8 @@ h2 {
   transform: scale(0.95);
 }
 
-.weight-unit {
+.weight-unit,
+.reps-unit {
   font-size: 0.75rem;
   color: var(--text-muted);
   font-weight: 500;
