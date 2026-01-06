@@ -118,7 +118,7 @@ class Api {
     return data;
   }
 
-  async logout(): void {
+  async logout(): Promise<void> {
     this.setToken(null);
   }
 

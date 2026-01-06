@@ -8,8 +8,10 @@
     "start": "tsx src/server.ts",
     "seed": "tsx src/seed.ts",
     "build:frontend": "esbuild public/app.ts --bundle --outfile=public/app.js --minify",
+    "build:frontend:ts": "tsc --noEmit -p tsconfig.frontend.json && npm run build:frontend",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

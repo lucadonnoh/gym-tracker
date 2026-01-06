@@ -7,3 +7,8 @@ node_modules/
 test-results/
 playwright-report/
 .claude/
+
+# Ignore intermediate JS files in public/ (only app.js is the bundle output)
+public/api.js
+public/templates.js
+public/types.js

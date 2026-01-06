@@ -16,8 +16,10 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - run: npm run build:frontend
+      - run: npm run build:frontend:ts
       - run: npm test
+      - run: npx playwright install chromium --with-deps
+      - run: npm run test:e2e
 
   deploy-staging:
     needs: test
