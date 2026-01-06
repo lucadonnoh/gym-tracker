@@ -470,7 +470,7 @@ class GymTrackerApp {
   async logSetWeight(exerciseId: number, setNumber: number, weight: string, reps: string | number | null, isDropset: boolean = false): Promise<void> {
     if (!this.currentSession) return;
 
-    const weightParsed = parseFloat(weight);
+    const weightParsed = parseFloat(weight.replace(',', '.'));
     const weightNum = isNaN(weightParsed) ? null : weightParsed;
     const repsParsed = typeof reps === 'string' ? parseInt(reps) : reps;
     const repsNum = (typeof repsParsed === 'number' && isNaN(repsParsed)) ? null : repsParsed;
@@ -957,7 +957,8 @@ class GymTrackerApp {
     event.preventDefault();
     if (!this.viewingSessionId) return;
 
-    const weightParsed = parseFloat((document.getElementById('edit-set-weight') as HTMLInputElement).value);
+    const weightVal = (document.getElementById('edit-set-weight') as HTMLInputElement).value.replace(',', '.');
+    const weightParsed = parseFloat(weightVal);
     const weight = isNaN(weightParsed) ? null : weightParsed;
     const repsParsed = parseInt((document.getElementById('edit-set-reps') as HTMLInputElement).value);
     const reps = isNaN(repsParsed) ? null : repsParsed;
@@ -1416,7 +1417,8 @@ class GymTrackerApp {
 
     MEASUREMENT_FIELDS.forEach(f => {
       const input = document.getElementById(`measurement-${f.key}`) as HTMLInputElement;
-      data[f.key] = input?.value ? parseFloat(input.value) : null;
+      const val = input?.value?.replace(',', '.');
+      data[f.key] = val ? parseFloat(val) : null;
     });
 
     try {
@@ -1538,7 +1540,8 @@ class GymTrackerApp {
     const dayId = parseInt((document.getElementById('exercise-day-id') as HTMLInputElement).value);
     const name = (document.getElementById('exercise-name') as HTMLInputElement).value;
     const description = this.generateDescription() || null;
-    const defaultWeight = parseFloat((document.getElementById('exercise-weight') as HTMLInputElement).value) || null;
+    const defaultWeightVal = (document.getElementById('exercise-weight') as HTMLInputElement).value.replace(',', '.');
+    const defaultWeight = parseFloat(defaultWeightVal) || null;
 
     try {
       if (id) {
