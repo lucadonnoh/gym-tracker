@@ -166,6 +166,7 @@ function renderSetRow(exercise, expected, logged, lastSets) {
 function renderDropsetRow(exercise, expected, lastSets) {
   const loggedSets = exercise.sets || [];
   const dropsetData = [];
+  const repsArray = typeof expected.reps === "string" ? expected.reps.split("-").map((r) => parseInt(r) || 10) : [expected.reps];
   for (let i = 0; i < (expected.dropsetParts || 0); i++) {
     const subSetNum = expected.setNumber + i * 0.1;
     const subLogged = loggedSets.find((s) => Math.abs(s.set_number - subSetNum) < 0.01);
@@ -173,7 +174,8 @@ function renderDropsetRow(exercise, expected, lastSets) {
     dropsetData.push({
       weight: subLogged?.weight ?? "",
       logged: subLogged?.weight !== null && subLogged?.weight !== void 0,
-      placeholder: lastSet?.weight?.toString() || "kg"
+      placeholder: lastSet?.weight?.toString() || "kg",
+      reps: repsArray[i] ?? repsArray[0] ?? 10
     });
   }
   const allDropsetLogged = dropsetData.every((d) => d.logged);
@@ -189,7 +191,7 @@ function renderDropsetRow(exercise, expected, lastSets) {
             step="0.5"
             inputmode="decimal"
             placeholder="${d.placeholder}"
-            onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber + i * 0.1}, this.value, null, true)">
+            onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber + i * 0.1}, this.value, ${d.reps}, true)">
         `).join("")}
       </div>
       <span class="weight-unit">kg</span>
