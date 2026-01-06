@@ -1359,7 +1359,7 @@ class GymTrackerApp {
       const inputs = fields.map(f => `
         <label class="measurement-input-group">
           <span>${f.label} (${f.unit})</span>
-          <input type="number" id="measurement-${f.key}" step="0.1" inputmode="decimal">
+          <input type="text" id="measurement-${f.key}" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
         </label>
       `).join('');
       return title
