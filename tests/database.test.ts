@@ -111,9 +111,35 @@ function checkAndMigrateSchema(db: Database.Database): boolean {
     try { db.exec('ALTER TABLE workout_days ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
     try { db.exec('ALTER TABLE sessions ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
     try { db.exec('ALTER TABLE body_measurements ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+
+    // Settings table needs special handling - recreate with new schema
+    migrateSettingsTable(db);
+
     return true;
   }
   return false;
+}
+
+function migrateSettingsTable(db: Database.Database): void {
+  const settingsInfo = db.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+  if (settingsInfo.length > 0 && !settingsInfo.some(col => col.name === 'user_id')) {
+    try {
+      const oldSettings = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
+      db.exec('DROP TABLE settings');
+      // Create without FK constraint to allow NULL user_id for orphaned settings
+      db.exec(`
+        CREATE TABLE settings (
+          user_id INTEGER,
+          key TEXT NOT NULL,
+          value TEXT NOT NULL,
+          PRIMARY KEY (user_id, key)
+        )
+      `);
+      for (const s of oldSettings) {
+        db.prepare('INSERT INTO settings (user_id, key, value) VALUES (NULL, ?, ?)').run(s.key, s.value);
+      }
+    } catch {}
+  }
 }
 
 function migrateExistingData(db: Database.Database): void {
@@ -130,6 +156,15 @@ function migrateExistingData(db: Database.Database): void {
       db.prepare('UPDATE workout_days SET user_id = ? WHERE user_id IS NULL').run(userId);
       db.prepare('UPDATE sessions SET user_id = ? WHERE user_id IS NULL').run(userId);
       db.prepare('UPDATE body_measurements SET user_id = ? WHERE user_id IS NULL').run(userId);
+
+      // Migrate settings (user_id IS NULL is marker for orphaned settings from migrateSettingsTable)
+      try {
+        const oldSettings = db.prepare('SELECT key, value FROM settings WHERE user_id IS NULL').all() as { key: string; value: string }[];
+        for (const s of oldSettings) {
+          db.prepare('INSERT OR REPLACE INTO settings (user_id, key, value) VALUES (?, ?, ?)').run(userId, s.key, s.value);
+        }
+        db.prepare('DELETE FROM settings WHERE user_id IS NULL').run();
+      } catch {}
     }
   }
 }
@@ -234,6 +269,26 @@ describe('Database', () => {
 
       const measurements = db.prepare('SELECT * FROM body_measurements WHERE user_id = ?').all(user.id);
       expect(measurements.length).toBe(1);
+    });
+
+    it('should migrate settings table and allow user-scoped queries', () => {
+      insertOldSchemaData(db);
+
+      initializeDatabase(db);
+      migrateExistingData(db);
+
+      // Check user was created
+      const user = db.prepare('SELECT * FROM users WHERE username = ?').get('donnoh') as { id: number };
+
+      // Settings should be queryable with user_id (this would fail if settings table wasn't migrated)
+      const setting = db.prepare('SELECT value FROM settings WHERE user_id = ? AND key = ?').get(user.id, 'weekly_goal') as { value: string } | undefined;
+      expect(setting).toBeDefined();
+      expect(setting?.value).toBe('4');
+
+      // Should be able to insert new settings with user_id
+      expect(() => {
+        db.prepare('INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?)').run(user.id, 'test_key', 'test_value');
+      }).not.toThrow();
     });
 
     it('should preserve existing data during migration', () => {

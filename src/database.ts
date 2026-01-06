@@ -135,9 +135,43 @@ function checkAndMigrateSchema(): boolean {
     try { db.exec('ALTER TABLE workout_days ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
     try { db.exec('ALTER TABLE sessions ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
     try { db.exec('ALTER TABLE body_measurements ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+
+    // Settings table needs special handling - recreate with new schema
+    migrateSettingsTable();
+
     return true;
   }
   return false;
+}
+
+// Migrate settings table from old schema (key PRIMARY KEY) to new (user_id, key PRIMARY KEY)
+function migrateSettingsTable(): void {
+  const settingsInfo = db.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+  if (settingsInfo.length > 0 && !settingsInfo.some(col => col.name === 'user_id')) {
+    console.log('Migrating settings table schema...');
+    try {
+      // Backup old data
+      const oldSettings = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
+
+      // Drop old table and create new one (without FK to allow NULL for orphaned settings)
+      db.exec('DROP TABLE settings');
+      db.exec(`
+        CREATE TABLE settings (
+          user_id INTEGER,
+          key TEXT NOT NULL,
+          value TEXT NOT NULL,
+          PRIMARY KEY (user_id, key)
+        )
+      `);
+
+      // Store old settings with NULL user_id - they'll be assigned to user in migrateExistingData()
+      for (const s of oldSettings) {
+        db.prepare('INSERT INTO settings (user_id, key, value) VALUES (NULL, ?, ?)').run(s.key, s.value);
+      }
+    } catch (e) {
+      console.error('Failed to migrate settings table:', e);
+    }
+  }
 }
 
 // Run migration for existing data - creates donnoh user and assigns orphaned data
@@ -161,7 +195,7 @@ export function migrateExistingData(): void {
       db.prepare('UPDATE sessions SET user_id = ? WHERE user_id IS NULL').run(userId);
       db.prepare('UPDATE body_measurements SET user_id = ? WHERE user_id IS NULL').run(userId);
 
-      // Migrate settings
+      // Migrate settings (user_id IS NULL is marker for orphaned settings from migrateSettingsTable)
       try {
         const oldSettings = db.prepare('SELECT key, value FROM settings WHERE user_id IS NULL').all() as { key: string; value: string }[];
         for (const s of oldSettings) {
