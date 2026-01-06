@@ -127,3 +127,127 @@ export function insertOldSchemaData(db: Database.Database): void {
     INSERT INTO settings (key, value) VALUES ('weekly_goal', '4');
   `);
 }
+
+// Create a partial migration scenario (workout_days has user_id, but settings doesn't)
+// This simulates what happened on production
+export function createPartialMigrationSchema(db: Database.Database): void {
+  // Users table
+  db.exec(`
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Tables WITH user_id (already migrated)
+  db.exec(`
+    CREATE TABLE workout_days (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      display_name TEXT NOT NULL
+    );
+
+    CREATE TABLE exercises (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      day_id INTEGER NOT NULL REFERENCES workout_days(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT,
+      default_weight REAL,
+      order_index INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      day_id INTEGER NOT NULL REFERENCES workout_days(id),
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      notes TEXT
+    );
+
+    CREATE TABLE session_exercises (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      exercise_id INTEGER NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+      completed INTEGER NOT NULL DEFAULT 0,
+      notes TEXT
+    );
+
+    CREATE TABLE set_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_exercise_id INTEGER NOT NULL REFERENCES session_exercises(id) ON DELETE CASCADE,
+      set_number INTEGER NOT NULL,
+      weight REAL,
+      reps INTEGER,
+      is_dropset INTEGER NOT NULL DEFAULT 0,
+      notes TEXT
+    );
+
+    CREATE TABLE body_measurements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      measured_at TEXT NOT NULL,
+      weight REAL,
+      chest REAL,
+      waist REAL,
+      hips REAL,
+      left_arm REAL,
+      right_arm REAL,
+      left_thigh REAL,
+      right_thigh REAL,
+      left_calf REAL,
+      right_calf REAL,
+      shoulders REAL,
+      neck REAL,
+      notes TEXT
+    );
+  `);
+
+  // Settings table WITHOUT user_id (not migrated - the bug)
+  db.exec(`
+    CREATE TABLE settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+}
+
+// Insert data into partial migration schema
+export function insertPartialMigrationData(db: Database.Database): void {
+  // Create user
+  db.exec(`
+    INSERT INTO users (username, password_hash) VALUES ('donnoh', '$2b$10$somehash');
+  `);
+
+  // Insert workout days with user_id
+  db.exec(`
+    INSERT INTO workout_days (user_id, name, display_name) VALUES (1, 'push', 'Push Day');
+    INSERT INTO workout_days (user_id, name, display_name) VALUES (1, 'pull', 'Pull Day');
+  `);
+
+  // Insert exercises
+  db.exec(`
+    INSERT INTO exercises (day_id, name, description, default_weight, order_index)
+    VALUES (1, 'Bench Press', '3x10', 60, 0);
+  `);
+
+  // Insert sessions with user_id
+  db.exec(`
+    INSERT INTO sessions (user_id, day_id, started_at, ended_at)
+    VALUES (1, 1, '2024-01-01T10:00:00Z', '2024-01-01T11:00:00Z');
+  `);
+
+  // Insert body measurement with user_id
+  db.exec(`
+    INSERT INTO body_measurements (user_id, measured_at, weight, chest)
+    VALUES (1, '2024-01-01T10:00:00Z', 75.5, 100);
+  `);
+
+  // Insert setting (old schema without user_id column)
+  db.exec(`
+    INSERT INTO settings (key, value) VALUES ('weekly_goal', '4');
+  `);
+}

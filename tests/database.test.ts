@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import bcrypt from 'bcrypt';
-import { createTempDb, cleanupDb, createOldSchema, insertOldSchemaData } from './setup';
+import { createTempDb, cleanupDb, createOldSchema, insertOldSchemaData, createPartialMigrationSchema, insertPartialMigrationData } from './setup';
 
 // We need to test the actual database functions, so we'll recreate the key logic here
 // rather than importing (which would use the real DB path)
@@ -21,6 +21,9 @@ function initializeDatabase(db: Database.Database): void {
 
   // Check if we need to migrate old schema
   checkAndMigrateSchema(db);
+
+  // Always check if settings table needs migration (may have been missed in previous partial migration)
+  migrateSettingsTable(db);
 
   // Create tables - will skip if they exist
   db.exec(`
@@ -338,6 +341,48 @@ describe('Database', () => {
 
       expect(indexes.some(i => i.name === 'idx_workout_days_user')).toBe(true);
       expect(indexes.some(i => i.name === 'idx_sessions_user')).toBe(true);
+    });
+  });
+
+  describe('Partial Migration (settings table missed)', () => {
+    beforeEach(() => {
+      const temp = createTempDb();
+      db = temp.db;
+      dbPath = temp.path;
+      // Create schema where other tables have user_id but settings doesn't
+      createPartialMigrationSchema(db);
+    });
+
+    it('should migrate settings table even when other tables already have user_id', () => {
+      insertPartialMigrationData(db);
+
+      // Verify settings table doesn't have user_id before migration
+      const beforeInfo = db.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+      expect(beforeInfo.some(col => col.name === 'user_id')).toBe(false);
+
+      // Run initialization (should detect and fix settings table)
+      initializeDatabase(db);
+
+      // Verify settings table now has user_id
+      const afterInfo = db.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+      expect(afterInfo.some(col => col.name === 'user_id')).toBe(true);
+
+      // Verify we can query settings with user_id
+      expect(() => {
+        db.prepare('SELECT value FROM settings WHERE user_id = ? AND key = ?').get(1, 'weekly_goal');
+      }).not.toThrow();
+    });
+
+    it('should preserve existing settings data during partial migration', () => {
+      insertPartialMigrationData(db);
+
+      const beforeSettings = db.prepare('SELECT key, value FROM settings').all();
+
+      initializeDatabase(db);
+
+      // Settings should still exist (with NULL user_id initially)
+      const afterSettings = db.prepare('SELECT key, value FROM settings').all();
+      expect(afterSettings.length).toBe(beforeSettings.length);
     });
   });
 });

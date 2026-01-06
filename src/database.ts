@@ -27,6 +27,9 @@ export function initializeDatabase(): void {
   // Check if we need to migrate old schema (tables exist but without user_id)
   const needsMigration = checkAndMigrateSchema();
 
+  // Always check if settings table needs migration (may have been missed in previous partial migration)
+  migrateSettingsTable();
+
   // Now create tables - will skip if they exist (after migration added user_id)
   db.exec(`
     CREATE TABLE IF NOT EXISTS workout_days (
