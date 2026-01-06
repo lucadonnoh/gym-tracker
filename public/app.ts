@@ -456,7 +456,7 @@ class GymTrackerApp {
   // ===================
 
   async confirmSet(exerciseId: number, setNumber: number, defaultWeight: number, reps: number | null): Promise<void> {
-    if (!this.currentSession || !defaultWeight) return;
+    if (!this.currentSession || defaultWeight === null || defaultWeight === undefined) return;
 
     try {
       await api.logSet(this.currentSession.id, exerciseId, setNumber, defaultWeight, reps);
