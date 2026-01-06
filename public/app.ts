@@ -639,8 +639,8 @@ class GymTrackerApp {
     const segments = path.split('/').filter(Boolean);
 
     if (segments.length === 0) {
-      // Home
-      if (!isInitial) this.showScreen('home-screen', false);
+      // Home - always show home screen (even on initial load with valid token)
+      this.showScreen('home-screen', !isInitial);
       return;
     }
 
