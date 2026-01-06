@@ -718,7 +718,9 @@ class GymTrackerApp {
         }
         break;
       default:
-        this.showScreen(screen, updateHistory);
+        // Reload data for the screen, then show with skipClear since content is loaded
+        await this.reloadScreenData(screen);
+        this.showScreen(screen, updateHistory, true);
     }
   }
 
