@@ -17,6 +17,18 @@ import type {
 } from './types.js';
 import { MEASUREMENT_FIELDS } from './types.js';
 
+// Screen component system
+import { ScreenManager } from './screens/ScreenManager.js';
+import { HistoryScreen } from './screens/HistoryScreen.js';
+import { ManageScreen } from './screens/ManageScreen.js';
+import { ProgressScreen } from './screens/ProgressScreen.js';
+import { MeasurementsScreen } from './screens/MeasurementsScreen.js';
+import { SessionDetailScreen } from './screens/SessionDetailScreen.js';
+import { MeasurementDetailScreen } from './screens/MeasurementDetailScreen.js';
+import { HomeScreen } from './screens/HomeScreen.js';
+import { SessionScreen } from './screens/SessionScreen.js';
+import type { ScreenContext, RouteParams, AppState } from './screens/types.js';
+
 declare const Chart: any;
 
 class GymTrackerApp {
@@ -56,6 +68,9 @@ class GymTrackerApp {
   private progressCharts: any[] = [];
   private measurementCharts: any[] = [];
 
+  // Screen manager for modular screen components
+  private screenManager: ScreenManager;
+
   // Lazy DOM element getters
   private get $dayButtons() { return document.getElementById('day-buttons'); }
   private get $activeSessionBanner() { return document.getElementById('active-session-banner'); }
@@ -92,6 +107,10 @@ class GymTrackerApp {
       history.scrollRestoration = 'manual';
     }
 
+    // Initialize screen manager with context
+    this.screenManager = new ScreenManager(this.createScreenContext());
+    this.registerScreens();
+
     // Set up auth error handler - redirect to login on 401
     api.setAuthErrorHandler(() => {
       this.currentUser = null;
@@ -108,6 +127,56 @@ class GymTrackerApp {
     });
 
     this.init();
+  }
+
+  /**
+   * Create the ScreenContext that screens use to interact with the app.
+   */
+  private createScreenContext(): ScreenContext {
+    return {
+      navigate: (screenId: string, params?: RouteParams) => this.screenManager.navigateTo(screenId, params),
+      goBack: () => this.goBack(),
+      updateUrl: (screenId: string, params?: RouteParams) => this.updateUrl(screenId, params),
+      getState: () => this.getAppState(),
+      setState: (updates: Partial<AppState>) => this.setAppState(updates),
+      showScreen: (screenId: string) => this.showScreen(screenId, false, true),
+      scrollToTop: () => this.scrollToTop()
+    };
+  }
+
+  /**
+   * Register all screen components with the manager.
+   */
+  private registerScreens(): void {
+    const ctx = this.createScreenContext();
+    this.screenManager.register(new HistoryScreen(ctx));
+    this.screenManager.register(new ManageScreen(ctx));
+    this.screenManager.register(new ProgressScreen(ctx));
+    this.screenManager.register(new MeasurementsScreen(ctx));
+    this.screenManager.register(new SessionDetailScreen(ctx));
+    this.screenManager.register(new MeasurementDetailScreen(ctx));
+    this.screenManager.register(new HomeScreen(ctx));
+    this.screenManager.register(new SessionScreen(ctx));
+  }
+
+  /**
+   * Get the current app state for screens.
+   */
+  private getAppState(): AppState {
+    return {
+      currentUser: this.currentUser,
+      days: this.days,
+      currentSession: this.currentSession
+    };
+  }
+
+  /**
+   * Update app state from screens.
+   */
+  private setAppState(updates: Partial<AppState>): void {
+    if (updates.currentUser !== undefined) this.currentUser = updates.currentUser;
+    if (updates.days !== undefined) this.days = updates.days;
+    if (updates.currentSession !== undefined) this.currentSession = updates.currentSession;
   }
 
   private async init(): Promise<void> {
@@ -706,22 +775,15 @@ class GymTrackerApp {
   private async navigateToScreen(screen: string, params: { [key: string]: string }, updateHistory: boolean): Promise<void> {
     this.currentRouteParams = params;
 
-    switch (screen) {
-      case 'session-detail-screen':
-        if (params.id) {
-          await this.showSessionDetail(parseInt(params.id));
-        }
-        break;
-      case 'measurement-detail-screen':
-        if (params.id) {
-          await this.showMeasurementDetail(parseInt(params.id));
-        }
-        break;
-      default:
-        // Reload data for the screen, then show with skipClear since content is loaded
-        await this.reloadScreenData(screen);
-        this.showScreen(screen, updateHistory, true);
+    // Check if screen is managed by ScreenManager (most screens are now)
+    if (this.screenManager.has(screen)) {
+      await this.screenManager.navigateTo(screen, params, updateHistory);
+      return;
     }
+
+    // Fallback for screens not yet migrated to ScreenManager
+    await this.reloadScreenData(screen);
+    this.showScreen(screen, updateHistory, true);
   }
 
   goBack(): void {
@@ -730,75 +792,29 @@ class GymTrackerApp {
   }
 
   private async reloadScreenData(screenId: string): Promise<void> {
+    // Most screens are now managed by ScreenManager (navigateToScreen delegates to it)
+    // This method only handles screens not yet migrated
     switch (screenId) {
-      case 'home-screen':
-        this.checkActiveSession();
-        break;
-      case 'history-screen':
-        await this.loadHistory();
-        break;
-      case 'session-detail-screen':
-        if (this.viewingSessionId) {
-          await this.loadSessionDetailContent(this.viewingSessionId);
-        }
-        break;
-      case 'progress-screen':
-        await this.loadProgressDaySelect();
-        break;
-      case 'measurements-screen':
-        await this.loadMeasurements();
-        break;
-      case 'measurement-detail-screen':
-        if (this.viewingMeasurementId) {
-          await this.loadMeasurementDetail(this.viewingMeasurementId);
-        }
-        break;
-      case 'manage-screen':
-        await this.loadManageDaySelect();
+      case 'session-screen':
+        // Session screen handled specially - has complex timer/state logic
         break;
     }
   }
 
   private clearScreenContent(screenId: string): void {
+    // Most screens are now managed by ScreenManager
+    // This method only handles screens not yet migrated
     switch (screenId) {
       case 'session-screen':
         // Don't clear exercise list - it loads fast and clearing causes flash
         if (this.$sessionTimer) this.$sessionTimer.textContent = '00:00:00';
         break;
-      case 'history-screen':
-        if (this.$sessionHistory) this.$sessionHistory.innerHTML = templates.LOADING_HTML;
-        break;
-      case 'session-detail-screen':
-        if (this.$sessionDetailContent) this.$sessionDetailContent.innerHTML = templates.LOADING_HTML;
-        if (this.$detailSessionTitle) this.$detailSessionTitle.textContent = 'Loading...';
-        break;
-      case 'progress-screen':
-        if (this.$progressCharts) this.$progressCharts.innerHTML = '';
-        this.destroyProgressCharts();
-        break;
-      case 'measurements-screen':
-        if (this.$measurementsSummary) this.$measurementsSummary.innerHTML = '';
-        if (this.$measurementsCharts) this.$measurementsCharts.innerHTML = '';
-        if (this.$measurementsHistory) this.$measurementsHistory.innerHTML = templates.LOADING_HTML;
-        this.destroyMeasurementCharts();
-        break;
-      case 'measurement-detail-screen':
-        if (this.$measurementDetailContent) this.$measurementDetailContent.innerHTML = templates.LOADING_HTML;
-        if (this.$measurementDetailTitle) this.$measurementDetailTitle.textContent = 'Loading...';
-        break;
-      case 'manage-screen':
-        if (this.$manageExerciseList) this.$manageExerciseList.innerHTML = '';
-        this.$addExerciseBtn?.classList.add('hidden');
-        break;
     }
   }
 
-  showHome(): void {
+  async showHome(): Promise<void> {
     this.navigationStack = ['home-screen'];
-    this.showScreen('home-screen', false);
-    this.checkActiveSession();
-    this.loadSummaryStats();
-    this.updateUrl('home-screen');
+    await this.screenManager.navigateTo('home-screen');
   }
 
   private renderDayButtons(): void {
@@ -1009,73 +1025,25 @@ class GymTrackerApp {
   }
 
   // ===================
-  // History
+  // History (migrated to HistoryScreen)
   // ===================
 
   async showHistory(): Promise<void> {
-    await this.loadHistory();
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    this.showScreen('history-screen', true, true);  // skipClear: content already loaded
-    this.updateUrl('history-screen');
+    await this.screenManager.navigateTo('history-screen');
   }
 
-  private async loadHistory(): Promise<void> {
-    const sessions = await api.getSessions();
-
-    if (!this.$sessionHistory) return;
-
-    if (sessions.length === 0) {
-      this.$sessionHistory.innerHTML = '<p>No sessions yet</p>';
-      return;
-    }
-
-    this.$sessionHistory.innerHTML = sessions.map(s => templates.renderHistoryItem(s)).join('');
-  }
+  // loadHistory() moved to HistoryScreen.enter()
 
   // ===================
   // Session Detail
   // ===================
 
   async showSessionDetail(sessionId: number): Promise<void> {
-    this.viewingSessionId = sessionId;
-    await this.loadSessionDetailContent(sessionId);
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    this.showScreen('session-detail-screen', true, true);  // skipClear: content already loaded
-    this.updateUrl('session-detail-screen', { id: sessionId.toString() });
+    this.viewingSessionId = sessionId; // Keep for deleteSession compat
+    await this.screenManager.navigateTo('session-detail-screen', { id: sessionId.toString() });
   }
 
-  private async loadSessionDetailContent(sessionId: number): Promise<void> {
-    const [exercises, session, stats] = await Promise.all([
-      api.getSessionExercises(sessionId),
-      api.getSession(sessionId),
-      api.getSessionStats(sessionId)
-    ]);
-
-    if (this.$detailSessionTitle) {
-      const day = this.days.find(d => d.id === session.day_id);
-      const date = new Date(session.started_at).toLocaleDateString();
-      this.$detailSessionTitle.textContent = `${day?.display_name || 'Session'} - ${date}`;
-    }
-
-    if (!this.$sessionDetailContent) return;
-
-    const totalVolume = stats.reduce((sum, s) => sum + s.volume, 0);
-    const prCounts = {
-      volume: stats.filter(s => s.prs?.volume).length,
-      setVolume: stats.filter(s => s.prs?.setVolume).length,
-      weight: stats.filter(s => s.prs?.weight).length,
-      reps: stats.filter(s => s.prs?.reps).length
-    };
-    const totalPRs = prCounts.volume + prCounts.setVolume + prCounts.weight + prCounts.reps;
-
-    const summaryHtml = templates.renderSessionSummary(totalVolume, exercises.length, totalPRs);
-    const exercisesHtml = exercises.map(ex => {
-      const exStats = stats.find(s => s.exerciseId === ex.id);
-      return templates.renderSessionDetailExercise(ex, exStats);
-    }).join('');
-
-    this.$sessionDetailContent.innerHTML = summaryHtml + exercisesHtml;
-  }
+  // loadSessionDetailContent() moved to SessionDetailScreen.enter()
 
   async deleteSession(): Promise<void> {
     if (!this.viewingSessionId) return;
@@ -1189,10 +1157,7 @@ class GymTrackerApp {
   // ===================
 
   async showProgress(): Promise<void> {
-    await this.loadProgressDaySelect();
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    this.showScreen('progress-screen', true, true);  // skipClear: content already loaded
-    this.updateUrl('progress-screen');
+    await this.screenManager.navigateTo('progress-screen');
   }
 
   async showProgressForExercise(exerciseId: number): Promise<void> {
@@ -1201,31 +1166,23 @@ class GymTrackerApp {
     const exercise = exercises.find(e => e.id === exerciseId);
     if (!exercise) return;
 
-    // Load all content before showing screen
-    await this.loadProgressDaySelect();
+    // Navigate to progress screen first
+    await this.screenManager.navigateTo('progress-screen');
 
+    // Then select the day and load charts
     if (this.$progressDaySelect) {
       this.$progressDaySelect.value = exercise.day_id.toString();
       await this.loadDayProgress();
     }
 
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    this.showScreen('progress-screen', true, true);  // skipClear: content already loaded
-    this.updateUrl('progress-screen');
-
-    // Scroll to the specific exercise chart after screen is visible
+    // Scroll to the specific exercise chart after charts are loaded
     setTimeout(() => {
       const chartEl = document.getElementById(`progress-exercise-${exerciseId}`);
       chartEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   }
 
-  private async loadProgressDaySelect(): Promise<void> {
-    if (this.$progressDaySelect) {
-      this.$progressDaySelect.innerHTML = '<option value="">Select workout day...</option>' +
-        this.days.map(d => `<option value="${d.id}">${d.display_name}</option>`).join('');
-    }
-  }
+  // loadProgressDaySelect() moved to ProgressScreen.enter()
 
   async loadDayProgress(): Promise<void> {
     if (!this.$progressDaySelect || !this.$progressCharts) return;
@@ -1373,10 +1330,7 @@ class GymTrackerApp {
   // All field definitions come from MEASUREMENT_FIELDS config in types.ts
 
   async showMeasurements(): Promise<void> {
-    await this.loadMeasurements();
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    this.showScreen('measurements-screen', true, true);  // skipClear: content already loaded
-    this.updateUrl('measurements-screen');
+    await this.screenManager.navigateTo('measurements-screen');
   }
 
   private async loadMeasurements(): Promise<void> {
@@ -1500,36 +1454,11 @@ class GymTrackerApp {
   }
 
   async showMeasurementDetail(id: number): Promise<void> {
-    this.viewingMeasurementId = id;
-    await this.loadMeasurementDetail(id);
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    this.showScreen('measurement-detail-screen', true, true);  // skipClear: content already loaded
-    this.updateUrl('measurement-detail-screen', { id: id.toString() });
+    this.viewingMeasurementId = id; // Keep for deleteMeasurement compat
+    await this.screenManager.navigateTo('measurement-detail-screen', { id: id.toString() });
   }
 
-  private async loadMeasurementDetail(id: number): Promise<void> {
-    const m = await api.getMeasurement(id);
-
-    if (this.$measurementDetailTitle) {
-      this.$measurementDetailTitle.textContent = new Date(m.measured_at).toLocaleDateString();
-    }
-
-    if (this.$measurementDetailContent) {
-      // Use config to build detail rows
-      const rows = MEASUREMENT_FIELDS
-        .filter(f => m[f.key] !== null)
-        .map(f => `<div class="detail-row"><span class="detail-label">${f.label}</span><span class="detail-value">${m[f.key]} ${f.unit}</span></div>`)
-        .join('');
-
-      let html = `<div class="measurement-detail-rows">${rows || '<p class="no-data">No measurements recorded</p>'}</div>`;
-      if (m.notes) {
-        html += `<div class="measurement-notes-display"><strong>Notes:</strong> ${m.notes}</div>`;
-      }
-      html += `<button class="edit-measurement-btn" onclick="app.editMeasurement(${m.id})">Edit</button>`;
-
-      this.$measurementDetailContent.innerHTML = html;
-    }
-  }
+  // loadMeasurementDetail() moved to MeasurementDetailScreen.enter()
 
   private renderMeasurementForm(): void {
     if (!this.$measurementFormFields) return;
@@ -1614,13 +1543,15 @@ class GymTrackerApp {
       if (id) {
         await api.updateMeasurement(parseInt(id), data);
         this.closeMeasurementModal();
+        // Refresh the detail screen by re-navigating
         if (this.viewingMeasurementId) {
-          await this.loadMeasurementDetail(this.viewingMeasurementId);
+          await this.screenManager.navigateTo('measurement-detail-screen', { id: this.viewingMeasurementId.toString() });
         }
       } else {
         await api.createMeasurement(data);
         this.closeMeasurementModal();
-        await this.loadMeasurements();
+        // Refresh measurements list by re-navigating
+        await this.screenManager.navigateTo('measurements-screen');
       }
     } catch (err) {
       alert('Failed to save measurement');
@@ -1648,21 +1579,10 @@ class GymTrackerApp {
   // ===================
 
   async showManage(): Promise<void> {
-    await this.loadManageDaySelect();
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    this.showScreen('manage-screen', true, true);  // skipClear: content already loaded
-    this.updateUrl('manage-screen');
+    await this.screenManager.navigateTo('manage-screen');
   }
 
-  private async loadManageDaySelect(): Promise<void> {
-    if (this.$manageDaySelect) {
-      this.$manageDaySelect.innerHTML = '<option value="">Select workout day...</option>' +
-        this.days.map(d => `<option value="${d.id}">${d.display_name}</option>`).join('');
-    }
-
-    if (this.$manageExerciseList) this.$manageExerciseList.innerHTML = '';
-    this.$addExerciseBtn?.classList.add('hidden');
-  }
+  // loadManageDaySelect() moved to ManageScreen.enter()
 
   async loadDayExercises(): Promise<void> {
     if (!this.$manageDaySelect) return;
@@ -1718,10 +1638,12 @@ class GymTrackerApp {
     // Refresh days list
     this.days = await api.getDays();
     this.renderDayButtons();
-    await this.loadManageDaySelect();
 
-    // Select the new day
+    // Refresh manage day select dropdown
     if (this.$manageDaySelect) {
+      this.$manageDaySelect.innerHTML = '<option value="">Select workout day...</option>' +
+        this.days.map(d => `<option value="${d.id}">${d.display_name}</option>`).join('');
+      // Select the new day
       this.$manageDaySelect.value = result.id.toString();
       await this.loadDayExercises();
     }
