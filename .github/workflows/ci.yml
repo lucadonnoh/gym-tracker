@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI
 
 on:
   push:
@@ -21,23 +21,5 @@ jobs:
       - run: npx playwright install chromium --with-deps
       - run: npm run test:e2e
 
-  deploy-staging:
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to Staging
-        run: |
-          curl -X POST '${{ secrets.COOLIFY_URL }}/api/v1/deploy?uuid=${{ secrets.STAGING_UUID }}&force=true' \
-            -H 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}'
-
-  deploy-production:
-    needs: deploy-staging
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Deploy to Production
-        run: |
-          curl -X POST '${{ secrets.COOLIFY_URL }}/api/v1/deploy?uuid=${{ secrets.PROD_UUID }}&force=true' \
-            -H 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}'
+# Deployment is handled by Coolify's auto-deploy on push
+# (GitHub Actions can't reach local Coolify instance)
