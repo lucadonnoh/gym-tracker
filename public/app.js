@@ -1,1488 +1,213 @@
-// Main Gym Tracker App
-import { api } from './api.js';
-import * as templates from './templates.js';
-import { MEASUREMENT_FIELDS } from './types.js';
-class GymTrackerApp {
-    // Lazy DOM element getters
-    get $dayButtons() { return document.getElementById('day-buttons'); }
-    get $activeSessionBanner() { return document.getElementById('active-session-banner'); }
-    get $statsContainer() { return document.getElementById('stats-container'); }
-    get $weeklyGoalModal() { return document.getElementById('weekly-goal-modal'); }
-    get $weeklyGoalContent() { return document.getElementById('weekly-goal-content'); }
-    get $sessionDayName() { return document.getElementById('session-day-name'); }
-    get $sessionTimer() { return document.getElementById('session-timer'); }
-    get $exerciseList() { return document.getElementById('exercise-list'); }
-    get $sessionHistory() { return document.getElementById('session-history'); }
-    get $detailSessionTitle() { return document.getElementById('detail-session-title'); }
-    get $sessionDetailContent() { return document.getElementById('session-detail-content'); }
-    get $progressDaySelect() { return document.getElementById('progress-day-select'); }
-    get $progressCharts() { return document.getElementById('progress-charts'); }
-    get $manageDaySelect() { return document.getElementById('manage-day-select'); }
-    get $manageExerciseList() { return document.getElementById('manage-exercise-list'); }
-    get $addExerciseBtn() { return document.getElementById('add-exercise-btn'); }
-    get $exerciseModal() { return document.getElementById('exercise-modal'); }
-    get $restTimerModal() { return document.getElementById('rest-timer-modal'); }
-    get $editSetModal() { return document.getElementById('edit-set-modal'); }
-    get $measurementsSummary() { return document.getElementById('measurements-summary'); }
-    get $measurementsCharts() { return document.getElementById('measurements-charts'); }
-    get $measurementsHistory() { return document.getElementById('measurements-history'); }
-    get $measurementDetailTitle() { return document.getElementById('measurement-detail-title'); }
-    get $measurementDetailContent() { return document.getElementById('measurement-detail-content'); }
-    get $measurementModal() { return document.getElementById('measurement-modal'); }
-    get $measurementFormFields() { return document.getElementById('measurement-form-fields'); }
-    constructor() {
-        // State
-        this.days = [];
-        this.currentSession = null;
-        this.sessionStartTime = null;
-        this.currentExercises = [];
-        this.viewingSessionId = null;
-        this.viewingMeasurementId = null;
-        this.editingSetId = null;
-        this.setGroups = [];
-        this.navigationStack = ['home-screen'];
-        this.currentRouteParams = {};
-        // Timers
-        this.timerInterval = null;
-        this.restTimerInterval = null;
-        this.restTimeRemaining = 0;
-        // Charts (array for multiple exercise charts)
-        this.progressCharts = [];
-        this.measurementCharts = [];
-        // Disable browser's automatic scroll restoration
-        if ('scrollRestoration' in history) {
-            history.scrollRestoration = 'manual';
-        }
-        // Handle browser back/forward buttons
-        window.addEventListener('popstate', (event) => {
-            if (event.state?.screen) {
-                this.navigateToScreen(event.state.screen, event.state.params || {}, false);
-            }
-            else {
-                this.handleRoute(window.location.pathname, false);
-            }
-        });
-        this.init();
-    }
-    async init() {
-        // Load all data in parallel
-        const [days, activeSession, stats] = await Promise.all([
-            api.getDays(),
-            api.getActiveSession(),
-            api.getSummaryStats()
-        ]);
-        this.days = days;
-        // Check for active session
-        if (activeSession) {
-            this.currentSession = activeSession;
-            this.$activeSessionBanner?.classList.remove('hidden');
-        }
-        // Render all content
-        this.renderDayButtons();
-        if (this.$statsContainer) {
-            this.$statsContainer.innerHTML = templates.renderSummaryStats(stats);
-        }
-        // Wait for DOM update then reveal content
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        document.getElementById('home-content')?.classList.remove('loading');
-        // Handle initial route
-        await this.handleRoute(window.location.pathname, true);
-    }
-    // ===================
-    // Session Management
-    // ===================
-    async checkActiveSession() {
-        const session = await api.getActiveSession();
-        if (session) {
-            this.currentSession = session;
-            this.$activeSessionBanner?.classList.remove('hidden');
-        }
-    }
-    async startSession(dayId) {
-        try {
-            const result = await api.createSession(dayId);
-            if ('error' in result && result.activeSession) {
-                this.currentSession = result.activeSession;
-                await this.resumeSession();
-                return;
-            }
-            if ('error' in result) {
-                throw new Error(result.error);
-            }
-            this.currentSession = result;
-            const day = this.days.find(d => d.id === dayId);
-            if (this.currentSession && day) {
-                this.currentSession.day_display_name = day.display_name;
-            }
-            await this.enterSessionScreen();
-            this.updateUrl('session-screen');
-        }
-        catch (err) {
-            alert('Failed to start session');
-            console.error(err);
-        }
-    }
-    async resumeSession() {
-        if (this.currentSession) {
-            // Load everything first, THEN hide banner and show screen together
-            await this.enterSessionScreen();
-            // Hide banner after screen transition to avoid flash
-            this.$activeSessionBanner?.classList.add('hidden');
-            this.updateUrl('session-screen');
-        }
-    }
-    async enterSessionScreen() {
-        if (!this.currentSession)
-            return;
-        this.sessionStartTime = new Date(this.currentSession.started_at);
-        // Set day name first (it's in the header, visible immediately)
-        if (this.$sessionDayName) {
-            this.$sessionDayName.textContent = this.currentSession.day_display_name || 'Workout';
-        }
-        // Load exercises BEFORE showing screen to prevent flash
-        await this.loadSessionExercises();
-        // Force DOM update to complete before showing screen
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        // Now show the screen with content already loaded
-        this.showScreen('session-screen', true, true); // skipClear: content already loaded
-        this.startTimer();
-    }
-    confirmEndSession() {
-        if (confirm('End this session?')) {
-            this.finishSession();
-        }
-    }
-    async finishSession() {
-        if (!this.currentSession)
-            return;
-        try {
-            await api.endSession(this.currentSession.id);
-            this.stopTimer();
-            this.currentSession = null;
-            this.sessionStartTime = null;
-            this.days = await api.getDays();
-            this.renderDayButtons();
-            await this.loadSummaryStats();
-            this.showHome();
-        }
-        catch (err) {
-            alert('Failed to end session');
-            console.error(err);
-        }
-    }
-    async cancelSession() {
-        if (!this.currentSession)
-            return;
-        if (!confirm('Cancel this session? All logged sets will be deleted.'))
-            return;
-        try {
-            await api.deleteSession(this.currentSession.id);
-            this.stopTimer();
-            this.currentSession = null;
-            this.sessionStartTime = null;
-            this.days = await api.getDays();
-            this.renderDayButtons();
-            this.showHome();
-        }
-        catch (err) {
-            alert('Failed to cancel session');
-            console.error(err);
-        }
-    }
-    // ===================
-    // Timer Management
-    // ===================
-    startTimer() {
-        this.updateTimer();
-        this.timerInterval = window.setInterval(() => this.updateTimer(), 1000);
-    }
-    stopTimer() {
-        if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-            this.timerInterval = null;
-        }
-    }
-    updateTimer() {
-        if (!this.sessionStartTime || !this.$sessionTimer)
-            return;
-        const elapsed = Math.floor((Date.now() - this.sessionStartTime.getTime()) / 1000);
-        this.$sessionTimer.textContent = templates.formatTimer(elapsed);
-    }
-    // ===================
-    // Rest Timer
-    // ===================
-    showRestTimer() {
-        this.$restTimerModal?.classList.remove('hidden');
-        document.getElementById('rest-timer-select')?.classList.remove('hidden');
-        document.getElementById('rest-timer-countdown')?.classList.add('hidden');
-        document.getElementById('custom-rest-seconds').value = '';
-        const stopBtn = document.querySelector('.rest-timer-stop');
-        if (stopBtn)
-            stopBtn.textContent = 'Stop';
-    }
-    closeRestTimer() {
-        this.$restTimerModal?.classList.add('hidden');
-        this.stopRestTimer();
-    }
-    startRestTimer(seconds) {
-        this.restTimeRemaining = seconds;
-        document.getElementById('rest-timer-select')?.classList.add('hidden');
-        document.getElementById('rest-timer-countdown')?.classList.remove('hidden');
-        this.updateRestTimerDisplay();
-        this.restTimerInterval = window.setInterval(() => {
-            this.restTimeRemaining--;
-            this.updateRestTimerDisplay();
-            if (this.restTimeRemaining <= 0) {
-                this.restTimerComplete();
-            }
-        }, 1000);
-    }
-    startCustomRestTimer() {
-        const input = document.getElementById('custom-rest-seconds');
-        const seconds = parseInt(input.value);
-        if (seconds && seconds > 0) {
-            this.startRestTimer(seconds);
-        }
-    }
-    extendRestTimer(seconds) {
-        this.restTimeRemaining += seconds;
-        if (!this.restTimerInterval) {
-            const stopBtn = document.querySelector('.rest-timer-stop');
-            if (stopBtn)
-                stopBtn.textContent = 'Stop';
-            this.restTimerInterval = window.setInterval(() => {
-                this.restTimeRemaining--;
-                this.updateRestTimerDisplay();
-                if (this.restTimeRemaining <= 0) {
-                    this.restTimerComplete();
-                }
-            }, 1000);
-        }
-        this.updateRestTimerDisplay();
-    }
-    updateRestTimerDisplay() {
-        const display = document.getElementById('rest-timer-display');
-        if (!display)
-            return;
-        const mins = Math.floor(this.restTimeRemaining / 60);
-        const secs = this.restTimeRemaining % 60;
-        display.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
-    restTimerComplete() {
-        this.stopRestTimer();
-        if ('vibrate' in navigator) {
-            navigator.vibrate([200, 100, 200, 100, 200]);
-        }
-        document.getElementById('rest-timer-display').textContent = "Time's up!";
-        const stopBtn = document.querySelector('.rest-timer-stop');
-        if (stopBtn)
-            stopBtn.textContent = 'OK';
-    }
-    stopRestTimer() {
-        if (this.restTimerInterval) {
-            clearInterval(this.restTimerInterval);
-            this.restTimerInterval = null;
-        }
-        this.restTimeRemaining = 0;
-    }
-    // ===================
-    // Exercise Loading & Rendering
-    // ===================
-    async loadSessionExercises() {
-        if (!this.currentSession)
-            return;
-        this.currentExercises = await api.getSessionExercises(this.currentSession.id);
-        // Fetch last volume for each exercise in parallel
-        await Promise.all(this.currentExercises.map(async (ex) => {
-            const data = await api.getExerciseLastVolume(ex.id, this.currentSession.id);
-            ex.lastVolume = data.volume;
-        }));
-        if (this.$exerciseList) {
-            this.$exerciseList.innerHTML = this.currentExercises.map(ex => this.renderExerciseCard(ex)).join('');
-        }
-    }
-    renderExerciseCard(exercise) {
-        const loggedSets = exercise.sets || [];
-        const expectedSets = this.parseSetScheme(exercise.description);
-        const hasLoggedSets = loggedSets.some(s => s.weight !== null);
-        const lastSets = exercise.lastSets || [];
-        // Calculate current volume
-        const currentVolume = loggedSets.reduce((sum, set) => {
-            return set.weight && set.reps ? sum + (set.weight * set.reps) : sum;
-        }, 0);
-        // Build set rows
-        const setRows = expectedSets.map(expected => {
-            const logged = loggedSets.find(s => s.set_number === expected.setNumber);
-            return templates.renderSetRow(exercise, expected, logged, lastSets);
-        }).join('');
-        // Extra sets beyond expected
-        const maxExpected = expectedSets.length > 0 ? Math.max(...expectedSets.map(s => s.setNumber)) : 0;
-        const extraSets = loggedSets.filter(s => s.set_number > maxExpected && Number.isInteger(s.set_number));
-        const extraRows = extraSets.map(s => templates.renderExtraSetRow(exercise, s)).join('');
-        const volumeHtml = templates.renderVolumeDisplay(currentVolume, exercise.lastVolume);
-        return `
-      <div class="exercise-card ${hasLoggedSets ? 'completed' : ''}" id="exercise-${exercise.id}">
-        <div class="exercise-header">
-          <span class="exercise-name">${exercise.name}</span>
-          ${volumeHtml}
-        </div>
-        ${exercise.description ? `<div class="exercise-description">${exercise.description}</div>` : ''}
-        <div class="sets-list">
-          ${setRows}
-          ${extraRows}
-        </div>
-        <button class="add-set-btn" onclick="app.addExtraSet(${exercise.id})">+ Add Set</button>
+"use strict";(()=>{var S=class{async get(e){return(await fetch(e)).json()}async post(e,t){return(await fetch(e,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(t)})).json()}async put(e,t={}){let s=await fetch(e,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(t)});if(s.status!==204)return s.json()}async delete(e){return(await fetch(e,{method:"DELETE"})).ok}async getDays(){return this.get("/api/days")}async getDayExercises(e){return this.get(`/api/days/${e}/exercises`)}async getAllExercises(){return this.get("/api/exercises")}async getExercise(e){return this.get(`/api/exercises/${e}`)}async createExercise(e,t,s,i){return this.post("/api/exercises",{day_id:e,name:t,description:s,default_weight:i})}async updateExercise(e,t,s,i){return this.put(`/api/exercises/${e}`,{name:t,description:s,default_weight:i})}async deleteExercise(e){return this.delete(`/api/exercises/${e}`)}async getExerciseLastVolume(e,t){let s=t?`/api/exercises/${e}/last-volume?excludeSession=${t}`:`/api/exercises/${e}/last-volume`;return this.get(s)}async getSessions(){return this.get("/api/sessions")}async getActiveSession(){return this.get("/api/sessions/active")}async getSession(e){return this.get(`/api/sessions/${e}`)}async createSession(e){return(await fetch("/api/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({day_id:e})})).json()}async endSession(e,t){return this.put(`/api/sessions/${e}/end`,{notes:t})}async deleteSession(e){return this.delete(`/api/sessions/${e}`)}async getSessionExercises(e){return this.get(`/api/sessions/${e}/exercises`)}async getSessionStats(e){return this.get(`/api/sessions/${e}/stats`)}async logSet(e,t,s,i,a,n=!1,o=null){return this.post(`/api/sessions/${e}/exercises/${t}/sets`,{set_number:s,weight:i,reps:a,is_dropset:n,notes:o})}async markExerciseComplete(e,t,s=!0){await this.put(`/api/sessions/${e}/exercises/${t}/complete`,{completed:s})}async updateSet(e,t,s){return this.put(`/api/sets/${e}`,{weight:t,reps:s})}async deleteSet(e){return this.delete(`/api/sets/${e}`)}async getProgress(e){return this.get(`/api/progress/${e}`)}async getMeasurements(){return this.get("/api/measurements")}async getLatestMeasurement(){return this.get("/api/measurements/latest")}async getMeasurement(e){return this.get(`/api/measurements/${e}`)}async createMeasurement(e){return this.post("/api/measurements",e)}async updateMeasurement(e,t){return this.put(`/api/measurements/${e}`,t)}async deleteMeasurement(e){return this.delete(`/api/measurements/${e}`)}async getMeasurementProgress(){return this.get("/api/measurements")}async getSummaryStats(){return this.get("/api/stats/summary")}async getWeeklyGoal(){return this.get("/api/stats/weekly-goal")}async setWeeklyGoal(e){return this.put("/api/stats/weekly-goal",{goal:e})}},d=new S;function f(r){let e="";if(r.last_session_date){let t=new Date(r.last_session_date),i=new Date().getTime()-t.getTime(),a=Math.floor(i/(1e3*60*60*24));a===0?e="today":a===1?e="1 day ago":e=`${a} days ago`}return`
+    <button class="day-btn" onclick="app.startSession(${r.id})">
+      <span class="day-name">${r.display_name}</span>
+      ${e?`<span class="day-last">${e}</span>`:""}
+    </button>
+  `}function E(r){let e=new Date(r.started_at),t=r.ended_at?new Date(r.ended_at):null,s=t?B(t.getTime()-e.getTime()):"In progress";return`
+    <div class="history-item" onclick="app.showSessionDetail(${r.id})">
+      <div class="history-date">${e.toLocaleDateString()}</div>
+      <div class="history-day">${r.day_display_name}</div>
+      <div class="history-duration">${s}</div>
+    </div>
+  `}function b(r,e,t){return`
+    <div class="session-summary">
+      <div class="summary-stat">
+        <span class="summary-value">${r.toLocaleString()}</span>
+        <span class="summary-label">kg total</span>
       </div>
-    `;
-    }
-    parseSetScheme(description) {
-        if (!description)
-            return [{ setNumber: 1, reps: 10, isDropset: false }];
-        const sets = [];
-        let setNumber = 1;
-        const parts = description.split(',').map(p => p.trim());
-        for (const part of parts) {
-            const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)/i);
-            if (match) {
-                const count = parseInt(match[1]);
-                const repsStr = match[2].toLowerCase();
-                if (repsStr === 'max') {
-                    for (let i = 0; i < count; i++) {
-                        sets.push({ setNumber: setNumber++, reps: 'max', isDropset: false });
-                    }
-                }
-                else if (repsStr.includes('-')) {
-                    const dropsetParts = repsStr.split('-').length;
-                    sets.push({ setNumber: setNumber++, reps: repsStr, isDropset: true, dropsetParts });
-                }
-                else {
-                    const reps = parseInt(repsStr);
-                    for (let i = 0; i < count; i++) {
-                        sets.push({ setNumber: setNumber++, reps, isDropset: false });
-                    }
-                }
-            }
-        }
-        if (sets.length === 0) {
-            return [
-                { setNumber: 1, reps: 10, isDropset: false },
-                { setNumber: 2, reps: 10, isDropset: false },
-                { setNumber: 3, reps: 10, isDropset: false }
-            ];
-        }
-        return sets;
-    }
-    // ===================
-    // Set Logging
-    // ===================
-    async confirmSet(exerciseId, setNumber, defaultWeight, reps) {
-        if (!this.currentSession || !defaultWeight)
-            return;
-        try {
-            await api.logSet(this.currentSession.id, exerciseId, setNumber, defaultWeight, reps);
-            await api.markExerciseComplete(this.currentSession.id, exerciseId);
-            await this.loadSessionExercises();
-        }
-        catch (err) {
-            console.error('Failed to save set', err);
-        }
-    }
-    async logSetWeight(exerciseId, setNumber, weight, reps, isDropset = false) {
-        if (!this.currentSession)
-            return;
-        const weightNum = parseFloat(weight) || null;
-        const repsNum = typeof reps === 'string' ? (parseInt(reps) || null) : reps;
-        if (weightNum === null)
-            return;
-        try {
-            await api.logSet(this.currentSession.id, exerciseId, setNumber, weightNum, repsNum, isDropset);
-            await api.markExerciseComplete(this.currentSession.id, exerciseId);
-            const row = document.querySelector(`[data-exercise="${exerciseId}"][data-set="${setNumber}"]`);
-            if (row)
-                row.classList.add('logged');
-            const card = document.getElementById(`exercise-${exerciseId}`);
-            if (card)
-                card.classList.add('completed');
-            await this.loadSessionExercises();
-        }
-        catch (err) {
-            console.error('Failed to save set', err);
-        }
-    }
-    async addExtraSet(exerciseId) {
-        if (!this.currentSession)
-            return;
-        const exercise = this.currentExercises.find(e => e.id === exerciseId);
-        if (!exercise)
-            return;
-        const loggedSets = exercise.sets || [];
-        const expectedSets = this.parseSetScheme(exercise.description);
-        const maxSet = Math.max(...loggedSets.map(s => Math.floor(s.set_number)), ...expectedSets.map(s => s.setNumber), 0);
-        const card = document.getElementById(`exercise-${exerciseId}`);
-        const setsList = card?.querySelector('.sets-list');
-        if (!setsList)
-            return;
-        const newSetNum = maxSet + 1;
-        const defaultWeight = exercise.default_weight || '';
-        const newRow = document.createElement('div');
-        newRow.className = 'set-row';
-        newRow.dataset.exercise = exerciseId.toString();
-        newRow.dataset.set = newSetNum.toString();
-        newRow.innerHTML = `
-      <span class="set-label">Set ${newSetNum}</span>
-      <span class="set-reps">extra</span>
-      <input type="number" class="weight-input" value="${defaultWeight}" step="0.5" inputmode="decimal" placeholder="kg"
-        onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, this.value, 10)">
+      <div class="summary-stat">
+        <span class="summary-value">${e}</span>
+        <span class="summary-label">exercises</span>
+      </div>
+      ${t>0?`
+        <div class="summary-stat pr">
+          <span class="summary-value">${t}</span>
+          <span class="summary-label">PR${t>1?"s":""}</span>
+        </div>
+      `:""}
+    </div>
+  `}function M(r,e){let t=r.sets||[],s=e?.volume||0,i=e?.prs||{volume:!1,setVolume:!1,weight:!1,reps:!1},a=i.volume||i.setVolume||i.weight||i.reps,n=[];i.volume&&n.push('<span class="pr-badge pr-volume">Vol PR</span>'),i.setVolume&&n.push('<span class="pr-badge pr-set">Set PR</span>'),i.weight&&n.push('<span class="pr-badge pr-weight">1RM</span>'),i.reps&&n.push('<span class="pr-badge pr-reps">Reps PR</span>');let o=t.length>0?t.map(c=>`<span class="detail-set" onclick="app.openEditSetModal(${c.id}, ${c.weight??0}, ${c.reps??0})">${c.weight??"?"}kg x ${c.reps??"?"}</span>`).join(" "):'<span class="no-sets">No sets logged</span>';return`
+    <div class="detail-exercise ${a?"has-pr":""}">
+      <div class="detail-exercise-header" onclick="app.showProgressForExercise(${r.id})">
+        <span class="detail-exercise-name">${r.name}</span>
+        <div class="pr-badges">${n.join("")}</div>
+      </div>
+      <div class="detail-exercise-volume">${s.toLocaleString()} kg</div>
+      <div class="detail-sets">${o}</div>
+    </div>
+  `}function T(r){return`
+    <div class="manage-exercise">
+      <div class="manage-exercise-info">
+        <div class="manage-exercise-name">${r.name}</div>
+        <div class="manage-exercise-desc">${r.description||""} ${r.default_weight?`(${r.default_weight}kg)`:""}</div>
+      </div>
+      <div class="manage-actions">
+        <button onclick="app.editExercise(${r.id})">Edit</button>
+        <button class="delete-btn" onclick="app.deleteExercise(${r.id})">Delete</button>
+      </div>
+    </div>
+  `}function x(r,e){if(r<=0)return e&&e>0?`
+        <div class="volume-display">
+          <span class="volume-total volume-placeholder">\u2014 kg</span>
+          <span class="volume-last">(last: ${e.toFixed(0)} kg)</span>
+        </div>
+      `:`
+      <div class="volume-display">
+        <span class="volume-total volume-placeholder">\u2014 kg</span>
+      </div>
+    `;let t=null;if(e&&e>0){let s=(r-e)/e*100;s>0?t=`+${s.toFixed(0)}%`:s<0?t=`${s.toFixed(0)}%`:t="0%"}return`
+    <div class="volume-display">
+      <span class="volume-total">${r.toFixed(0)} kg</span>
+      ${t?`<span class="volume-change ${t.startsWith("+")?"up":t.startsWith("-")?"down":""}">${t}</span>`:""}
+      ${e?`<span class="volume-last">(last: ${e.toFixed(0)} kg)</span>`:""}
+    </div>
+  `}function k(r,e,t,s){let i=t?.weight??r.default_weight??"",a=t?.reps??(typeof e.reps=="number"?e.reps:""),n=e.reps==="max",o=t&&t.weight!==null;if(e.isDropset&&e.dropsetParts)return C(r,e,s);let c=o?i:"",m=s.find(v=>v.set_number===e.setNumber),l=m?.weight?.toString()||r.default_weight?.toString()||"kg",p=m?.reps?.toString()||"reps",u=m?.weight||r.default_weight||0,h=n?m?.reps||null:e.reps;return`
+    <div class="set-row ${o?"logged":""}" data-exercise="${r.id}" data-set="${e.setNumber}">
+      <span class="set-label">Set ${e.setNumber}</span>
+      <span class="set-reps">${n?"max":e.reps} reps</span>
+      ${n?`
+        <input type="number" class="reps-input ${o?"filled":""}"
+          value="${o?a:""}"
+          inputmode="numeric"
+          placeholder="${p}"
+          onchange="app.logSetWeight(${r.id}, ${e.setNumber}, document.querySelector('[data-exercise=\\'${r.id}\\'][data-set=\\'${e.setNumber}\\'] .weight-input').value, this.value)">
+      `:""}
+      <input type="number" class="weight-input ${o?"filled":""}"
+        value="${c}"
+        step="0.5"
+        inputmode="decimal"
+        placeholder="${l}"
+        onchange="app.logSetWeight(${r.id}, ${e.setNumber}, this.value, ${n?`document.querySelector('[data-exercise=\\'${r.id}\\'][data-set=\\'${e.setNumber}\\'] .reps-input').value`:e.reps})">
       <span class="weight-unit">kg</span>
-    `;
-        setsList.appendChild(newRow);
-        const input = newRow.querySelector('.weight-input');
-        input?.focus();
-        input?.select();
-    }
-    // ===================
-    // Navigation
-    // ===================
-    showScreen(screenId, addToHistory = true, skipClear = false) {
-        // Clear content first (before showing) to avoid flash
-        // Skip if content was pre-loaded before calling showScreen
-        if (!skipClear) {
-            this.clearScreenContent(screenId);
-        }
-        // Add active to new screen first, then remove from others
-        // This prevents a frame where no screen is visible
-        const targetScreen = document.getElementById(screenId);
-        targetScreen?.classList.add('active');
-        document.querySelectorAll('.screen').forEach(s => {
-            if (s.id !== screenId) {
-                s.classList.remove('active');
-            }
-        });
-        if (addToHistory && this.navigationStack[this.navigationStack.length - 1] !== screenId) {
-            this.navigationStack.push(screenId);
-        }
-        // Also scroll to top (backup, main scroll happens at start of navigation)
-        this.scrollToTop();
-    }
-    scrollToTop() {
-        // Reset scroll position to top using every possible method
-        // 1. Window scroll
-        window.scrollTo(0, 0);
-        // 2. Document elements
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-        // 3. Active screen and its main element
-        const activeScreen = document.querySelector('.screen.active');
-        if (activeScreen) {
-            activeScreen.scrollTop = 0;
-            const main = activeScreen.querySelector('main');
-            if (main)
-                main.scrollTop = 0;
-        }
-        // 4. App container
-        const app = document.getElementById('app');
-        if (app)
-            app.scrollTop = 0;
-        // 5. Delayed scroll for iOS momentum scrolling
-        requestAnimationFrame(() => {
-            window.scrollTo(0, 0);
-            document.documentElement.scrollTop = 0;
-            document.body.scrollTop = 0;
-        });
-    }
-    // ===================
-    // URL Routing
-    // ===================
-    updateUrl(screen, params = {}) {
-        let path = GymTrackerApp.routes[screen] || '/';
-        // Replace :id placeholders with actual values
-        for (const [key, value] of Object.entries(params)) {
-            path = path.replace(`:${key}`, value);
-        }
-        // Only push state if URL actually changed
-        if (window.location.pathname !== path) {
-            history.pushState({ screen, params }, '', path);
-        }
-    }
-    async handleRoute(path, isInitial) {
-        // Parse the path and navigate to the correct screen
-        const segments = path.split('/').filter(Boolean);
-        if (segments.length === 0) {
-            // Home
-            if (!isInitial)
-                this.showScreen('home-screen', false);
-            return;
-        }
-        switch (segments[0]) {
-            case 'session':
-                // Resume or show session screen
-                if (this.currentSession) {
-                    await this.resumeSession();
-                }
-                else {
-                    this.showScreen('home-screen', false);
-                    this.updateUrl('home-screen');
-                }
-                break;
-            case 'history':
-                if (segments[1]) {
-                    // /history/:id - session detail
-                    const sessionId = parseInt(segments[1]);
-                    if (!isNaN(sessionId)) {
-                        await this.showSessionDetail(sessionId);
-                    }
-                }
-                else {
-                    // /history - history list
-                    await this.showHistory();
-                }
-                break;
-            case 'progress':
-                if (segments[1]) {
-                    // /progress/:exerciseId
-                    const exerciseId = parseInt(segments[1]);
-                    if (!isNaN(exerciseId)) {
-                        await this.showProgressForExercise(exerciseId);
-                    }
-                }
-                else {
-                    await this.showProgress();
-                }
-                break;
-            case 'body':
-                if (segments[1]) {
-                    // /body/:id - measurement detail
-                    const measurementId = parseInt(segments[1]);
-                    if (!isNaN(measurementId)) {
-                        await this.showMeasurementDetail(measurementId);
-                    }
-                }
-                else {
-                    await this.showMeasurements();
-                }
-                break;
-            case 'manage':
-                await this.showManage();
-                break;
-            default:
-                // Unknown route, go home
-                this.showScreen('home-screen', false);
-                this.updateUrl('home-screen');
-        }
-    }
-    async navigateToScreen(screen, params, updateHistory) {
-        this.currentRouteParams = params;
-        switch (screen) {
-            case 'session-detail-screen':
-                if (params.id) {
-                    await this.showSessionDetail(parseInt(params.id));
-                }
-                break;
-            case 'measurement-detail-screen':
-                if (params.id) {
-                    await this.showMeasurementDetail(parseInt(params.id));
-                }
-                break;
-            default:
-                this.showScreen(screen, updateHistory);
-        }
-    }
-    goBack() {
-        // Use browser history for proper URL navigation
-        history.back();
-    }
-    async reloadScreenData(screenId) {
-        switch (screenId) {
-            case 'home-screen':
-                this.checkActiveSession();
-                break;
-            case 'history-screen':
-                await this.loadHistory();
-                break;
-            case 'session-detail-screen':
-                if (this.viewingSessionId) {
-                    await this.loadSessionDetailContent(this.viewingSessionId);
-                }
-                break;
-            case 'progress-screen':
-                await this.loadProgressDaySelect();
-                break;
-            case 'measurements-screen':
-                await this.loadMeasurements();
-                break;
-            case 'measurement-detail-screen':
-                if (this.viewingMeasurementId) {
-                    await this.loadMeasurementDetail(this.viewingMeasurementId);
-                }
-                break;
-            case 'manage-screen':
-                await this.loadManageDaySelect();
-                break;
-        }
-    }
-    clearScreenContent(screenId) {
-        switch (screenId) {
-            case 'session-screen':
-                // Don't clear exercise list - it loads fast and clearing causes flash
-                if (this.$sessionTimer)
-                    this.$sessionTimer.textContent = '00:00:00';
-                break;
-            case 'history-screen':
-                if (this.$sessionHistory)
-                    this.$sessionHistory.innerHTML = templates.LOADING_HTML;
-                break;
-            case 'session-detail-screen':
-                if (this.$sessionDetailContent)
-                    this.$sessionDetailContent.innerHTML = templates.LOADING_HTML;
-                if (this.$detailSessionTitle)
-                    this.$detailSessionTitle.textContent = 'Loading...';
-                break;
-            case 'progress-screen':
-                if (this.$progressCharts)
-                    this.$progressCharts.innerHTML = '';
-                this.destroyProgressCharts();
-                break;
-            case 'measurements-screen':
-                if (this.$measurementsSummary)
-                    this.$measurementsSummary.innerHTML = '';
-                if (this.$measurementsCharts)
-                    this.$measurementsCharts.innerHTML = '';
-                if (this.$measurementsHistory)
-                    this.$measurementsHistory.innerHTML = templates.LOADING_HTML;
-                this.destroyMeasurementCharts();
-                break;
-            case 'measurement-detail-screen':
-                if (this.$measurementDetailContent)
-                    this.$measurementDetailContent.innerHTML = templates.LOADING_HTML;
-                if (this.$measurementDetailTitle)
-                    this.$measurementDetailTitle.textContent = 'Loading...';
-                break;
-            case 'manage-screen':
-                if (this.$manageExerciseList)
-                    this.$manageExerciseList.innerHTML = '';
-                this.$addExerciseBtn?.classList.add('hidden');
-                break;
-        }
-    }
-    showHome() {
-        this.navigationStack = ['home-screen'];
-        this.showScreen('home-screen', false);
-        this.checkActiveSession();
-        this.loadSummaryStats();
-        this.updateUrl('home-screen');
-    }
-    renderDayButtons() {
-        if (this.$dayButtons) {
-            this.$dayButtons.innerHTML = this.days.map(d => templates.renderDayButton(d)).join('');
-        }
-    }
-    // ===================
-    // Summary Stats
-    // ===================
-    async loadSummaryStats() {
-        try {
-            const stats = await api.getSummaryStats();
-            if (this.$statsContainer) {
-                this.$statsContainer.innerHTML = templates.renderSummaryStats(stats);
-            }
-        }
-        catch (err) {
-            console.error('Failed to load summary stats', err);
-        }
-    }
-    editWeeklyGoal() {
-        api.getWeeklyGoal().then(({ goal }) => {
-            if (this.$weeklyGoalContent) {
-                this.$weeklyGoalContent.innerHTML = templates.renderWeeklyGoalModal(goal);
-            }
-            this.$weeklyGoalModal?.classList.remove('hidden');
-        });
-    }
-    async setWeeklyGoal(goal) {
-        try {
-            await api.setWeeklyGoal(goal);
-            this.$weeklyGoalModal?.classList.add('hidden');
-            await this.loadSummaryStats();
-        }
-        catch (err) {
-            alert('Failed to save weekly goal');
-            console.error(err);
-        }
-    }
-    closeWeeklyGoalModal() {
-        this.$weeklyGoalModal?.classList.add('hidden');
-    }
-    // ===================
-    // History
-    // ===================
-    async showHistory() {
-        await this.loadHistory();
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        this.showScreen('history-screen', true, true); // skipClear: content already loaded
-        this.updateUrl('history-screen');
-    }
-    async loadHistory() {
-        const sessions = await api.getSessions();
-        if (!this.$sessionHistory)
-            return;
-        if (sessions.length === 0) {
-            this.$sessionHistory.innerHTML = '<p>No sessions yet</p>';
-            return;
-        }
-        this.$sessionHistory.innerHTML = sessions.map(s => templates.renderHistoryItem(s)).join('');
-    }
-    // ===================
-    // Session Detail
-    // ===================
-    async showSessionDetail(sessionId) {
-        this.viewingSessionId = sessionId;
-        await this.loadSessionDetailContent(sessionId);
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        this.showScreen('session-detail-screen', true, true); // skipClear: content already loaded
-        this.updateUrl('session-detail-screen', { id: sessionId.toString() });
-    }
-    async loadSessionDetailContent(sessionId) {
-        const [exercises, session, stats] = await Promise.all([
-            api.getSessionExercises(sessionId),
-            api.getSession(sessionId),
-            api.getSessionStats(sessionId)
-        ]);
-        if (this.$detailSessionTitle) {
-            const day = this.days.find(d => d.id === session.day_id);
-            const date = new Date(session.started_at).toLocaleDateString();
-            this.$detailSessionTitle.textContent = `${day?.display_name || 'Session'} - ${date}`;
-        }
-        if (!this.$sessionDetailContent)
-            return;
-        const totalVolume = stats.reduce((sum, s) => sum + s.volume, 0);
-        const prCounts = {
-            volume: stats.filter(s => s.prs?.volume).length,
-            setVolume: stats.filter(s => s.prs?.setVolume).length,
-            weight: stats.filter(s => s.prs?.weight).length,
-            reps: stats.filter(s => s.prs?.reps).length
-        };
-        const totalPRs = prCounts.volume + prCounts.setVolume + prCounts.weight + prCounts.reps;
-        const summaryHtml = templates.renderSessionSummary(totalVolume, exercises.length, totalPRs);
-        const exercisesHtml = exercises.map(ex => {
-            const exStats = stats.find(s => s.exerciseId === ex.id);
-            return templates.renderSessionDetailExercise(ex, exStats);
-        }).join('');
-        this.$sessionDetailContent.innerHTML = summaryHtml + exercisesHtml;
-    }
-    async deleteSession() {
-        if (!this.viewingSessionId)
-            return;
-        if (!confirm('Delete this session? This cannot be undone.'))
-            return;
-        try {
-            await api.deleteSession(this.viewingSessionId);
-            this.viewingSessionId = null;
-            // Remove session-detail-screen from stack before going back
-            // so back button doesn't return to a deleted session
-            this.navigationStack = this.navigationStack.filter(s => s !== 'session-detail-screen');
-            this.goBack();
-        }
-        catch (err) {
-            alert('Failed to delete session');
-            console.error(err);
-        }
-    }
-    // ===================
-    // Edit Set Modal
-    // ===================
-    openEditSetModal(setId, weight, reps) {
-        this.editingSetId = setId;
-        const weightEl = document.getElementById('edit-set-weight');
-        const repsEl = document.getElementById('edit-set-reps');
-        const setIdEl = document.getElementById('edit-set-id');
-        if (!weightEl || !repsEl || !setIdEl)
-            return;
-        setIdEl.value = setId.toString();
-        weightEl.value = weight.toString();
-        repsEl.value = reps.toString();
-        this.$editSetModal?.classList.remove('hidden');
-        weightEl.focus();
-        weightEl.select();
-    }
-    closeEditSetModal() {
-        this.$editSetModal?.classList.add('hidden');
-        this.editingSetId = null;
-    }
-    async updateSet(event) {
-        event.preventDefault();
-        if (!this.editingSetId || !this.viewingSessionId)
-            return;
-        const weight = parseFloat(document.getElementById('edit-set-weight').value) || null;
-        const reps = parseInt(document.getElementById('edit-set-reps').value) || null;
-        try {
-            await api.updateSet(this.editingSetId, weight, reps);
-            this.closeEditSetModal();
-            await this.showSessionDetail(this.viewingSessionId);
-        }
-        catch (err) {
-            alert('Failed to update set');
-            console.error(err);
-        }
-    }
-    async deleteSet() {
-        if (!this.editingSetId || !this.viewingSessionId)
-            return;
-        if (!confirm('Delete this set?'))
-            return;
-        try {
-            await api.deleteSet(this.editingSetId);
-            this.closeEditSetModal();
-            await this.showSessionDetail(this.viewingSessionId);
-        }
-        catch (err) {
-            alert('Failed to delete set');
-            console.error(err);
-        }
-    }
-    // ===================
-    // Progress Charts
-    // ===================
-    async showProgress() {
-        await this.loadProgressDaySelect();
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        this.showScreen('progress-screen', true, true); // skipClear: content already loaded
-        this.updateUrl('progress-screen');
-    }
-    async showProgressForExercise(exerciseId) {
-        // Find which day this exercise belongs to
-        const exercises = await api.getAllExercises();
-        const exercise = exercises.find(e => e.id === exerciseId);
-        if (!exercise)
-            return;
-        // Load all content before showing screen
-        await this.loadProgressDaySelect();
-        if (this.$progressDaySelect) {
-            this.$progressDaySelect.value = exercise.day_id.toString();
-            await this.loadDayProgress();
-        }
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        this.showScreen('progress-screen', true, true); // skipClear: content already loaded
-        this.updateUrl('progress-screen');
-        // Scroll to the specific exercise chart after screen is visible
-        setTimeout(() => {
-            const chartEl = document.getElementById(`progress-exercise-${exerciseId}`);
-            chartEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-    }
-    async loadProgressDaySelect() {
-        if (this.$progressDaySelect) {
-            this.$progressDaySelect.innerHTML = '<option value="">Select workout day...</option>' +
-                this.days.map(d => `<option value="${d.id}">${d.display_name}</option>`).join('');
-        }
-    }
-    async loadDayProgress() {
-        if (!this.$progressDaySelect || !this.$progressCharts)
-            return;
-        const dayId = this.$progressDaySelect.value;
-        if (!dayId) {
-            this.$progressCharts.innerHTML = '';
-            this.destroyProgressCharts();
-            return;
-        }
-        // Get all exercises for this day
-        const exercises = await api.getDayExercises(parseInt(dayId));
-        if (exercises.length === 0) {
-            this.$progressCharts.innerHTML = '<p class="no-data">No exercises for this day</p>';
-            return;
-        }
-        // Destroy old charts
-        this.destroyProgressCharts();
-        // Create container for each exercise
-        this.$progressCharts.innerHTML = exercises.map(ex => `
-      <div class="progress-exercise" id="progress-exercise-${ex.id}">
-        <h3 class="progress-exercise-name">${ex.name}</h3>
-        <div class="progress-exercise-charts">
-          <canvas id="weight-chart-${ex.id}"></canvas>
-          <canvas id="reps-chart-${ex.id}"></canvas>
+      ${o?"":`<button class="confirm-btn" onclick="app.confirmSet(${r.id}, ${e.setNumber}, ${u}, ${h})">\u2713</button>`}
+    </div>
+  `}function C(r,e,t){let s=r.sets||[],i=[];for(let n=0;n<(e.dropsetParts||0);n++){let o=e.setNumber+n*.1,c=s.find(l=>Math.abs(l.set_number-o)<.01),m=t.find(l=>Math.abs(l.set_number-o)<.01);i.push({weight:c?.weight??"",logged:c?.weight!==null&&c?.weight!==void 0,placeholder:m?.weight?.toString()||"kg"})}return`
+    <div class="set-row ${i.every(n=>n.logged)?"logged":""}" data-exercise="${r.id}" data-set="${e.setNumber}">
+      <span class="set-label">Set ${e.setNumber}</span>
+      <span class="set-reps">${e.reps}</span>
+      <div class="dropset-weights">
+        ${i.map((n,o)=>`
+          <input type="number" class="weight-input dropset-weight ${n.logged?"filled":""}"
+            data-dropset-index="${o}"
+            value="${n.logged?n.weight:""}"
+            step="0.5"
+            inputmode="decimal"
+            placeholder="${n.placeholder}"
+            onchange="app.logSetWeight(${r.id}, ${e.setNumber+o*.1}, this.value, null, true)">
+        `).join("")}
+      </div>
+      <span class="weight-unit">kg</span>
+    </div>
+  `}function I(r,e){return`
+    <div class="set-row logged" data-exercise="${r.id}" data-set="${e.set_number}">
+      <span class="set-label">Set ${e.set_number}</span>
+      <span class="set-reps">extra</span>
+      <input type="number" class="weight-input"
+        value="${e.weight??""}"
+        step="0.5"
+        inputmode="decimal"
+        placeholder="kg"
+        onchange="app.logSetWeight(${r.id}, ${e.set_number}, this.value, ${e.reps||10})">
+      <span class="weight-unit">kg</span>
+    </div>
+  `}function B(r){let e=Math.floor(r/6e4),t=Math.floor(e/60),s=e%60;return t>0?`${t}h ${s}m`:`${s}m`}function D(r){let e=Math.floor(r/3600),t=Math.floor(r%3600/60),s=r%60;return`${e.toString().padStart(2,"0")}:${t.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`}function w(r){let e=r.currentWeekWorkouts.map(n=>n.dayOfWeek),t=e.length>=r.weeklyGoal,s=["M","T","W","T","F","S","S"],i=[6,0,1,2,3,4,5],a=s.map((n,o)=>{let c=[1,2,3,4,5,6,0][o],m=e.includes(c),l=new Date().getDay()===c;return`<div class="week-day ${m?"completed":""} ${l?"today":""}">${n}</div>`}).join("");return`
+    <div class="summary-stats">
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-value">${r.totalWorkouts}</div>
+          <div class="stat-label">workouts</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">${r.totalHours}</div>
+          <div class="stat-label">hours</div>
+        </div>
+        <div class="stat-box streak ${r.streak.current>0?"active":""}">
+          <div class="stat-value">${r.streak.current}</div>
+          <div class="stat-label">week streak</div>
         </div>
       </div>
-    `).join('');
-        // Load progress data and render charts for each exercise
-        for (const exercise of exercises) {
-            const data = await api.getProgress(exercise.id);
-            if (data.length > 0) {
-                this.renderExerciseCharts(exercise.id, exercise.name, data);
-            }
-            else {
-                const container = document.getElementById(`progress-exercise-${exercise.id}`);
-                const chartsDiv = container?.querySelector('.progress-exercise-charts');
-                if (chartsDiv) {
-                    chartsDiv.innerHTML = '<p class="no-data">No data yet</p>';
-                }
-            }
-        }
-    }
-    destroyProgressCharts() {
-        for (const chart of this.progressCharts) {
-            chart.destroy();
-        }
-        this.progressCharts = [];
-    }
-    renderExerciseCharts(exerciseId, exerciseName, data) {
-        const labels = data.map(d => d.date);
-        const weights = data.map(d => d.maxWeight);
-        const reps = data.map(d => d.totalReps);
-        const darkThemeOptions = {
-            responsive: true,
-            plugins: {
-                legend: { display: false },
-                title: {
-                    display: true,
-                    color: '#888888',
-                    font: { family: 'Outfit', weight: '500', size: 12 }
-                }
-            },
-            scales: {
-                x: {
-                    ticks: { color: '#555555', font: { family: 'Outfit', size: 10 } },
-                    grid: { color: '#1a1a1a' }
-                },
-                y: {
-                    ticks: { color: '#555555', font: { family: 'Outfit', size: 10 } },
-                    grid: { color: '#1a1a1a' }
-                }
-            }
-        };
-        const weightCtx = document.getElementById(`weight-chart-${exerciseId}`);
-        if (weightCtx) {
-            const weightChart = new Chart(weightCtx, {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: [{
-                            label: 'Max Weight (kg)',
-                            data: weights,
-                            borderColor: '#22c55e',
-                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                            fill: true,
-                            tension: 0.3,
-                            pointBackgroundColor: '#22c55e',
-                            pointBorderColor: '#22c55e',
-                            pointRadius: 3
-                        }]
-                },
-                options: {
-                    ...darkThemeOptions,
-                    plugins: {
-                        ...darkThemeOptions.plugins,
-                        title: { ...darkThemeOptions.plugins.title, text: 'Weight' }
-                    }
-                }
-            });
-            this.progressCharts.push(weightChart);
-        }
-        const repsCtx = document.getElementById(`reps-chart-${exerciseId}`);
-        if (repsCtx) {
-            const repsChart = new Chart(repsCtx, {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: [{
-                            label: 'Total Reps',
-                            data: reps,
-                            borderColor: '#3b82f6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            fill: true,
-                            tension: 0.3,
-                            pointBackgroundColor: '#3b82f6',
-                            pointBorderColor: '#3b82f6',
-                            pointRadius: 3
-                        }]
-                },
-                options: {
-                    ...darkThemeOptions,
-                    plugins: {
-                        ...darkThemeOptions.plugins,
-                        title: { ...darkThemeOptions.plugins.title, text: 'Reps' }
-                    }
-                }
-            });
-            this.progressCharts.push(repsChart);
-        }
-    }
-    // ===================
-    // Body Measurements
-    // ===================
-    // All field definitions come from MEASUREMENT_FIELDS config in types.ts
-    async showMeasurements() {
-        await this.loadMeasurements();
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        this.showScreen('measurements-screen', true, true); // skipClear: content already loaded
-        this.updateUrl('measurements-screen');
-    }
-    async loadMeasurements() {
-        const [measurements, latest] = await Promise.all([
-            api.getMeasurements(),
-            api.getLatestMeasurement()
-        ]);
-        // Render summary using config
-        if (this.$measurementsSummary && latest) {
-            const stats = MEASUREMENT_FIELDS
-                .filter(f => latest[f.key] !== null)
-                .slice(0, 5) // Show max 5 stats in summary
-                .map(f => `<div class="measurement-stat"><span class="stat-value">${latest[f.key]}</span><span class="stat-label">${f.unit} ${f.label.toLowerCase()}</span></div>`)
-                .join('');
-            this.$measurementsSummary.innerHTML = `
-        <div class="measurement-summary-card">
-          <div class="measurement-summary-date">Last: ${new Date(latest.measured_at).toLocaleDateString()}</div>
-          <div class="measurement-summary-stats">${stats}</div>
+
+      <div class="weekly-progress">
+        <div class="weekly-header">
+          <span class="weekly-title">This Week</span>
+          <button class="weekly-goal-btn" onclick="app.editWeeklyGoal()">${e.length}/${r.weeklyGoal}</button>
         </div>
-      `;
-        }
-        else if (this.$measurementsSummary) {
-            this.$measurementsSummary.innerHTML = '';
-        }
-        // Render charts
-        await this.renderMeasurementCharts(measurements);
-        // Render history
-        if (this.$measurementsHistory) {
-            if (measurements.length === 0) {
-                this.$measurementsHistory.innerHTML = '<p class="no-data">No measurements yet</p>';
-            }
-            else {
-                this.$measurementsHistory.innerHTML = measurements.map(m => {
-                    const details = MEASUREMENT_FIELDS
-                        .filter(f => m[f.key] !== null)
-                        .slice(0, 2)
-                        .map(f => `${m[f.key]} ${f.unit}`)
-                        .join(' • ') || 'Measurements recorded';
-                    return `
-            <div class="measurement-history-item" onclick="app.showMeasurementDetail(${m.id})">
-              <div class="measurement-history-date">${new Date(m.measured_at).toLocaleDateString()}</div>
-              <div class="measurement-history-details">${details}</div>
+        <div class="week-days">${a}</div>
+        ${t?'<div class="week-complete">Week completed!</div>':""}
+      </div>
+    </div>
+  `}function L(r){return`
+    <div class="goal-modal-content">
+      <h3>Weekly Goal</h3>
+      <p>How many times per week do you want to work out?</p>
+      <div class="goal-options">${[1,2,3,4,5,6,7].map(t=>`<button class="goal-option ${t===r?"selected":""}" onclick="app.setWeeklyGoal(${t})">${t}x/week</button>`).join("")}</div>
+      <button class="goal-cancel-btn" onclick="app.closeWeeklyGoalModal()">Cancel</button>
+    </div>
+  `}var y='<p style="text-align:center;color:#999;padding:2rem;">Loading...</p>';var g=[{key:"weight",label:"Weight",unit:"kg",color:"#4CAF50",section:"main"},{key:"chest",label:"Chest",unit:"cm",color:"#9C27B0",section:"upper"},{key:"shoulders",label:"Shoulders",unit:"cm",color:"#E91E63",section:"upper"},{key:"neck",label:"Neck",unit:"cm",color:"#F44336",section:"upper"},{key:"left_arm",label:"Left Arm",unit:"cm",color:"#00BCD4",section:"upper"},{key:"right_arm",label:"Right Arm",unit:"cm",color:"#009688",section:"upper"},{key:"waist",label:"Waist",unit:"cm",color:"#FF9800",section:"core"},{key:"hips",label:"Hips",unit:"cm",color:"#795548",section:"core"},{key:"left_thigh",label:"Left Thigh",unit:"cm",color:"#3F51B5",section:"lower"},{key:"right_thigh",label:"Right Thigh",unit:"cm",color:"#673AB7",section:"lower"},{key:"left_calf",label:"Left Calf",unit:"cm",color:"#607D8B",section:"lower"},{key:"right_calf",label:"Right Calf",unit:"cm",color:"#455A64",section:"lower"}];var $=class r{days=[];currentSession=null;sessionStartTime=null;currentExercises=[];viewingSessionId=null;viewingMeasurementId=null;editingSetId=null;addingSetExerciseId=null;addingSetNumber=null;setGroups=[];navigationStack=["home-screen"];currentRouteParams={};static routes={"home-screen":"/","session-screen":"/session","history-screen":"/history","session-detail-screen":"/history/:id","progress-screen":"/progress","measurements-screen":"/body","measurement-detail-screen":"/body/:id","manage-screen":"/manage"};timerInterval=null;restTimerInterval=null;restTimeRemaining=0;progressCharts=[];measurementCharts=[];get $dayButtons(){return document.getElementById("day-buttons")}get $activeSessionBanner(){return document.getElementById("active-session-banner")}get $statsContainer(){return document.getElementById("stats-container")}get $weeklyGoalModal(){return document.getElementById("weekly-goal-modal")}get $weeklyGoalContent(){return document.getElementById("weekly-goal-content")}get $sessionDayName(){return document.getElementById("session-day-name")}get $sessionTimer(){return document.getElementById("session-timer")}get $exerciseList(){return document.getElementById("exercise-list")}get $sessionHistory(){return document.getElementById("session-history")}get $detailSessionTitle(){return document.getElementById("detail-session-title")}get $sessionDetailContent(){return document.getElementById("session-detail-content")}get $progressDaySelect(){return document.getElementById("progress-day-select")}get $progressCharts(){return document.getElementById("progress-charts")}get $manageDaySelect(){return document.getElementById("manage-day-select")}get $manageExerciseList(){return document.getElementById("manage-exercise-list")}get $addExerciseBtn(){return document.getElementById("add-exercise-btn")}get $exerciseModal(){return document.getElementById("exercise-modal")}get $restTimerModal(){return document.getElementById("rest-timer-modal")}get $editSetModal(){return document.getElementById("edit-set-modal")}get $measurementsSummary(){return document.getElementById("measurements-summary")}get $measurementsCharts(){return document.getElementById("measurements-charts")}get $measurementsHistory(){return document.getElementById("measurements-history")}get $measurementDetailTitle(){return document.getElementById("measurement-detail-title")}get $measurementDetailContent(){return document.getElementById("measurement-detail-content")}get $measurementModal(){return document.getElementById("measurement-modal")}get $measurementFormFields(){return document.getElementById("measurement-form-fields")}constructor(){"scrollRestoration"in history&&(history.scrollRestoration="manual"),window.addEventListener("popstate",e=>{e.state?.screen?this.navigateToScreen(e.state.screen,e.state.params||{},!1):this.handleRoute(window.location.pathname,!1)}),this.init()}async init(){let[e,t,s]=await Promise.all([d.getDays(),d.getActiveSession(),d.getSummaryStats()]);this.days=e,t&&(this.currentSession=t,this.$activeSessionBanner?.classList.remove("hidden")),this.renderDayButtons(),this.$statsContainer&&(this.$statsContainer.innerHTML=w(s)),await new Promise(i=>requestAnimationFrame(i)),document.getElementById("home-content")?.classList.remove("loading"),await this.handleRoute(window.location.pathname,!0)}async checkActiveSession(){let e=await d.getActiveSession();e&&(this.currentSession=e,this.$activeSessionBanner?.classList.remove("hidden"))}async startSession(e){try{let t=await d.createSession(e);if("error"in t&&t.activeSession){this.currentSession=t.activeSession,await this.resumeSession();return}if("error"in t)throw new Error(t.error);this.currentSession=t;let s=this.days.find(i=>i.id===e);this.currentSession&&s&&(this.currentSession.day_display_name=s.display_name),await this.enterSessionScreen(),this.updateUrl("session-screen")}catch(t){alert("Failed to start session"),console.error(t)}}async resumeSession(){this.currentSession&&(await this.enterSessionScreen(),this.$activeSessionBanner?.classList.add("hidden"),this.updateUrl("session-screen"))}async enterSessionScreen(){this.currentSession&&(this.sessionStartTime=new Date(this.currentSession.started_at),this.$sessionDayName&&(this.$sessionDayName.textContent=this.currentSession.day_display_name||"Workout"),await this.loadSessionExercises(),await new Promise(e=>requestAnimationFrame(e)),this.showScreen("session-screen",!0,!0),this.startTimer())}confirmEndSession(){confirm("End this session?")&&this.finishSession()}async finishSession(){if(this.currentSession)try{await d.endSession(this.currentSession.id),this.stopTimer(),this.currentSession=null,this.sessionStartTime=null,this.days=await d.getDays(),this.renderDayButtons(),await this.loadSummaryStats(),this.showHome()}catch(e){alert("Failed to end session"),console.error(e)}}async cancelSession(){if(this.currentSession&&confirm("Cancel this session? All logged sets will be deleted."))try{await d.deleteSession(this.currentSession.id),this.stopTimer(),this.currentSession=null,this.sessionStartTime=null,this.days=await d.getDays(),this.renderDayButtons(),this.showHome()}catch(e){alert("Failed to cancel session"),console.error(e)}}startTimer(){this.updateTimer(),this.timerInterval=window.setInterval(()=>this.updateTimer(),1e3)}stopTimer(){this.timerInterval&&(clearInterval(this.timerInterval),this.timerInterval=null)}updateTimer(){if(!this.sessionStartTime||!this.$sessionTimer)return;let e=Math.floor((Date.now()-this.sessionStartTime.getTime())/1e3);this.$sessionTimer.textContent=D(e)}showRestTimer(){this.$restTimerModal?.classList.remove("hidden"),document.getElementById("rest-timer-select")?.classList.remove("hidden"),document.getElementById("rest-timer-countdown")?.classList.add("hidden"),document.getElementById("custom-rest-seconds").value="";let e=document.querySelector(".rest-timer-stop");e&&(e.textContent="Stop")}closeRestTimer(){this.$restTimerModal?.classList.add("hidden"),this.stopRestTimer()}startRestTimer(e){this.restTimeRemaining=e,document.getElementById("rest-timer-select")?.classList.add("hidden"),document.getElementById("rest-timer-countdown")?.classList.remove("hidden"),this.updateRestTimerDisplay(),this.restTimerInterval=window.setInterval(()=>{this.restTimeRemaining--,this.updateRestTimerDisplay(),this.restTimeRemaining<=0&&this.restTimerComplete()},1e3)}startCustomRestTimer(){let e=document.getElementById("custom-rest-seconds"),t=parseInt(e.value);t&&t>0&&this.startRestTimer(t)}extendRestTimer(e){if(this.restTimeRemaining+=e,!this.restTimerInterval){let t=document.querySelector(".rest-timer-stop");t&&(t.textContent="Stop"),this.restTimerInterval=window.setInterval(()=>{this.restTimeRemaining--,this.updateRestTimerDisplay(),this.restTimeRemaining<=0&&this.restTimerComplete()},1e3)}this.updateRestTimerDisplay()}updateRestTimerDisplay(){let e=document.getElementById("rest-timer-display");if(!e)return;let t=Math.floor(this.restTimeRemaining/60),s=this.restTimeRemaining%60;e.textContent=`${t}:${s.toString().padStart(2,"0")}`}restTimerComplete(){this.stopRestTimer(),"vibrate"in navigator&&navigator.vibrate([200,100,200,100,200]),document.getElementById("rest-timer-display").textContent="Time's up!";let e=document.querySelector(".rest-timer-stop");e&&(e.textContent="OK")}stopRestTimer(){this.restTimerInterval&&(clearInterval(this.restTimerInterval),this.restTimerInterval=null),this.restTimeRemaining=0}async loadSessionExercises(){this.currentSession&&(this.currentExercises=await d.getSessionExercises(this.currentSession.id),await Promise.all(this.currentExercises.map(async e=>{let t=await d.getExerciseLastVolume(e.id,this.currentSession.id);e.lastVolume=t.volume})),this.$exerciseList&&(this.$exerciseList.innerHTML=this.currentExercises.map(e=>this.renderExerciseCard(e)).join("")))}renderExerciseCard(e){let t=e.sets||[],s=this.parseSetScheme(e.description),i=t.some(u=>u.weight!==null),a=e.lastSets||[],n=t.reduce((u,h)=>h.weight&&h.reps?u+h.weight*h.reps:u,0),o=s.map(u=>{let h=t.find(v=>v.set_number===u.setNumber);return k(e,u,h,a)}).join(""),c=s.length>0?Math.max(...s.map(u=>u.setNumber)):0,l=t.filter(u=>u.set_number>c&&Number.isInteger(u.set_number)).map(u=>I(e,u)).join(""),p=x(n,e.lastVolume);return`
+      <div class="exercise-card ${i?"completed":""}" id="exercise-${e.id}">
+        <div class="exercise-header">
+          <span class="exercise-name">${e.name}</span>
+          ${p}
+        </div>
+        ${e.description?`<div class="exercise-description">${e.description}</div>`:""}
+        <div class="sets-list">
+          ${o}
+          ${l}
+        </div>
+        <button class="add-set-btn" onclick="app.addExtraSet(${e.id})">+ Add Set</button>
+      </div>
+    `}parseSetScheme(e){if(!e)return[{setNumber:1,reps:10,isDropset:!1}];let t=[],s=1,i=e.split(",").map(a=>a.trim());for(let a of i){let n=a.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)/i);if(n){let o=parseInt(n[1]),c=n[2].toLowerCase();if(c==="max")for(let m=0;m<o;m++)t.push({setNumber:s++,reps:"max",isDropset:!1});else if(c.includes("-")){let m=c.split("-").length;t.push({setNumber:s++,reps:c,isDropset:!0,dropsetParts:m})}else{let m=parseInt(c);for(let l=0;l<o;l++)t.push({setNumber:s++,reps:m,isDropset:!1})}}}return t.length===0?[{setNumber:1,reps:10,isDropset:!1},{setNumber:2,reps:10,isDropset:!1},{setNumber:3,reps:10,isDropset:!1}]:t}async confirmSet(e,t,s,i){if(!(!this.currentSession||!s))try{await d.logSet(this.currentSession.id,e,t,s,i),await d.markExerciseComplete(this.currentSession.id,e),await this.loadSessionExercises()}catch(a){console.error("Failed to save set",a)}}async logSetWeight(e,t,s,i,a=!1){if(!this.currentSession)return;let n=parseFloat(s)||null,o=typeof i=="string"?parseInt(i)||null:i;if(n!==null)try{await d.logSet(this.currentSession.id,e,t,n,o,a),await d.markExerciseComplete(this.currentSession.id,e);let c=document.querySelector(`[data-exercise="${e}"][data-set="${t}"]`);c&&c.classList.add("logged");let m=document.getElementById(`exercise-${e}`);m&&m.classList.add("completed"),await this.loadSessionExercises()}catch(c){console.error("Failed to save set",c)}}async addExtraSet(e){if(!this.currentSession)return;let t=this.currentExercises.find(u=>u.id===e);if(!t)return;let s=t.sets||[],i=this.parseSetScheme(t.description),a=Math.max(...s.map(u=>Math.floor(u.set_number)),...i.map(u=>u.setNumber),0),o=document.getElementById(`exercise-${e}`)?.querySelector(".sets-list");if(!o)return;let c=a+1,m=t.default_weight||"",l=document.createElement("div");l.className="set-row",l.dataset.exercise=e.toString(),l.dataset.set=c.toString(),l.innerHTML=`
+      <span class="set-label">Set ${c}</span>
+      <span class="set-reps">extra</span>
+      <input type="number" class="weight-input" value="${m}" step="0.5" inputmode="decimal" placeholder="kg"
+        onchange="app.logSetWeight(${e}, ${c}, this.value, 10)">
+      <span class="weight-unit">kg</span>
+    `,o.appendChild(l);let p=l.querySelector(".weight-input");p?.focus(),p?.select()}showScreen(e,t=!0,s=!1){s||this.clearScreenContent(e),document.getElementById(e)?.classList.add("active"),document.querySelectorAll(".screen").forEach(a=>{a.id!==e&&a.classList.remove("active")}),t&&this.navigationStack[this.navigationStack.length-1]!==e&&this.navigationStack.push(e),this.scrollToTop()}scrollToTop(){window.scrollTo(0,0),document.documentElement.scrollTop=0,document.body.scrollTop=0;let e=document.querySelector(".screen.active");if(e){e.scrollTop=0;let s=e.querySelector("main");s&&(s.scrollTop=0)}let t=document.getElementById("app");t&&(t.scrollTop=0),requestAnimationFrame(()=>{window.scrollTo(0,0),document.documentElement.scrollTop=0,document.body.scrollTop=0})}updateUrl(e,t={}){let s=r.routes[e]||"/";for(let[i,a]of Object.entries(t))s=s.replace(`:${i}`,a);window.location.pathname!==s&&history.pushState({screen:e,params:t},"",s)}async handleRoute(e,t){let s=e.split("/").filter(Boolean);if(s.length===0){t||this.showScreen("home-screen",!1);return}switch(s[0]){case"session":this.currentSession?await this.resumeSession():(this.showScreen("home-screen",!1),this.updateUrl("home-screen"));break;case"history":if(s[1]){let i=parseInt(s[1]);isNaN(i)||await this.showSessionDetail(i)}else await this.showHistory();break;case"progress":if(s[1]){let i=parseInt(s[1]);isNaN(i)||await this.showProgressForExercise(i)}else await this.showProgress();break;case"body":if(s[1]){let i=parseInt(s[1]);isNaN(i)||await this.showMeasurementDetail(i)}else await this.showMeasurements();break;case"manage":await this.showManage();break;default:this.showScreen("home-screen",!1),this.updateUrl("home-screen")}}async navigateToScreen(e,t,s){switch(this.currentRouteParams=t,e){case"session-detail-screen":t.id&&await this.showSessionDetail(parseInt(t.id));break;case"measurement-detail-screen":t.id&&await this.showMeasurementDetail(parseInt(t.id));break;default:this.showScreen(e,s)}}goBack(){history.back()}async reloadScreenData(e){switch(e){case"home-screen":this.checkActiveSession();break;case"history-screen":await this.loadHistory();break;case"session-detail-screen":this.viewingSessionId&&await this.loadSessionDetailContent(this.viewingSessionId);break;case"progress-screen":await this.loadProgressDaySelect();break;case"measurements-screen":await this.loadMeasurements();break;case"measurement-detail-screen":this.viewingMeasurementId&&await this.loadMeasurementDetail(this.viewingMeasurementId);break;case"manage-screen":await this.loadManageDaySelect();break}}clearScreenContent(e){switch(e){case"session-screen":this.$sessionTimer&&(this.$sessionTimer.textContent="00:00:00");break;case"history-screen":this.$sessionHistory&&(this.$sessionHistory.innerHTML=y);break;case"session-detail-screen":this.$sessionDetailContent&&(this.$sessionDetailContent.innerHTML=y),this.$detailSessionTitle&&(this.$detailSessionTitle.textContent="Loading...");break;case"progress-screen":this.$progressCharts&&(this.$progressCharts.innerHTML=""),this.destroyProgressCharts();break;case"measurements-screen":this.$measurementsSummary&&(this.$measurementsSummary.innerHTML=""),this.$measurementsCharts&&(this.$measurementsCharts.innerHTML=""),this.$measurementsHistory&&(this.$measurementsHistory.innerHTML=y),this.destroyMeasurementCharts();break;case"measurement-detail-screen":this.$measurementDetailContent&&(this.$measurementDetailContent.innerHTML=y),this.$measurementDetailTitle&&(this.$measurementDetailTitle.textContent="Loading...");break;case"manage-screen":this.$manageExerciseList&&(this.$manageExerciseList.innerHTML=""),this.$addExerciseBtn?.classList.add("hidden");break}}showHome(){this.navigationStack=["home-screen"],this.showScreen("home-screen",!1),this.checkActiveSession(),this.loadSummaryStats(),this.updateUrl("home-screen")}renderDayButtons(){this.$dayButtons&&(this.$dayButtons.innerHTML=this.days.map(e=>f(e)).join(""))}async loadSummaryStats(){try{let e=await d.getSummaryStats();this.$statsContainer&&(this.$statsContainer.innerHTML=w(e))}catch(e){console.error("Failed to load summary stats",e)}}editWeeklyGoal(){d.getWeeklyGoal().then(({goal:e})=>{this.$weeklyGoalContent&&(this.$weeklyGoalContent.innerHTML=L(e)),this.$weeklyGoalModal?.classList.remove("hidden")})}async setWeeklyGoal(e){try{await d.setWeeklyGoal(e),this.$weeklyGoalModal?.classList.add("hidden"),await this.loadSummaryStats()}catch(t){alert("Failed to save weekly goal"),console.error(t)}}closeWeeklyGoalModal(){this.$weeklyGoalModal?.classList.add("hidden")}async showHistory(){await this.loadHistory(),await new Promise(e=>requestAnimationFrame(e)),this.showScreen("history-screen",!0,!0),this.updateUrl("history-screen")}async loadHistory(){let e=await d.getSessions();if(this.$sessionHistory){if(e.length===0){this.$sessionHistory.innerHTML="<p>No sessions yet</p>";return}this.$sessionHistory.innerHTML=e.map(t=>E(t)).join("")}}async showSessionDetail(e){this.viewingSessionId=e,await this.loadSessionDetailContent(e),await new Promise(t=>requestAnimationFrame(t)),this.showScreen("session-detail-screen",!0,!0),this.updateUrl("session-detail-screen",{id:e.toString()})}async loadSessionDetailContent(e){let[t,s,i]=await Promise.all([d.getSessionExercises(e),d.getSession(e),d.getSessionStats(e)]);if(this.$detailSessionTitle){let l=this.days.find(u=>u.id===s.day_id),p=new Date(s.started_at).toLocaleDateString();this.$detailSessionTitle.textContent=`${l?.display_name||"Session"} - ${p}`}if(!this.$sessionDetailContent)return;let a=i.reduce((l,p)=>l+p.volume,0),n={volume:i.filter(l=>l.prs?.volume).length,setVolume:i.filter(l=>l.prs?.setVolume).length,weight:i.filter(l=>l.prs?.weight).length,reps:i.filter(l=>l.prs?.reps).length},o=n.volume+n.setVolume+n.weight+n.reps,c=b(a,t.length,o),m=t.map(l=>{let p=i.find(u=>u.exerciseId===l.id);return M(l,p)}).join("");this.$sessionDetailContent.innerHTML=c+m}async deleteSession(){if(this.viewingSessionId&&confirm("Delete this session? This cannot be undone."))try{await d.deleteSession(this.viewingSessionId),this.viewingSessionId=null,this.navigationStack=this.navigationStack.filter(e=>e!=="session-detail-screen"),this.goBack()}catch(e){alert("Failed to delete session"),console.error(e)}}openEditSetModal(e,t,s){this.editingSetId=e;let i=document.getElementById("edit-set-weight"),a=document.getElementById("edit-set-reps"),n=document.getElementById("edit-set-id");!i||!a||!n||(n.value=e.toString(),i.value=t.toString(),a.value=s.toString(),this.$editSetModal?.classList.remove("hidden"),i.focus(),i.select())}closeEditSetModal(){this.$editSetModal?.classList.add("hidden"),this.editingSetId=null,this.addingSetExerciseId=null,this.addingSetNumber=null}openAddSetModal(e,t){this.addingSetExerciseId=e,this.addingSetNumber=t,this.editingSetId=null;let s=document.getElementById("edit-set-weight"),i=document.getElementById("edit-set-reps"),a=document.getElementById("edit-set-id");!s||!i||!a||(a.value="",s.value="",i.value="",this.$editSetModal?.classList.remove("hidden"),s.focus())}async updateSet(e){if(e.preventDefault(),!this.viewingSessionId)return;let t=parseFloat(document.getElementById("edit-set-weight").value)||null,s=parseInt(document.getElementById("edit-set-reps").value)||null;try{if(this.addingSetExerciseId&&this.addingSetNumber)await d.logSet(this.viewingSessionId,this.addingSetExerciseId,this.addingSetNumber,t,s);else if(this.editingSetId)await d.updateSet(this.editingSetId,t,s);else return;this.closeEditSetModal(),await this.showSessionDetail(this.viewingSessionId)}catch(i){alert("Failed to save set"),console.error(i)}}async deleteSet(){if(!(!this.editingSetId||!this.viewingSessionId)&&confirm("Delete this set?"))try{await d.deleteSet(this.editingSetId),this.closeEditSetModal(),await this.showSessionDetail(this.viewingSessionId)}catch(e){alert("Failed to delete set"),console.error(e)}}async showProgress(){await this.loadProgressDaySelect(),await new Promise(e=>requestAnimationFrame(e)),this.showScreen("progress-screen",!0,!0),this.updateUrl("progress-screen")}async showProgressForExercise(e){let s=(await d.getAllExercises()).find(i=>i.id===e);s&&(await this.loadProgressDaySelect(),this.$progressDaySelect&&(this.$progressDaySelect.value=s.day_id.toString(),await this.loadDayProgress()),await new Promise(i=>requestAnimationFrame(i)),this.showScreen("progress-screen",!0,!0),this.updateUrl("progress-screen"),setTimeout(()=>{document.getElementById(`progress-exercise-${e}`)?.scrollIntoView({behavior:"smooth",block:"start"})},100))}async loadProgressDaySelect(){this.$progressDaySelect&&(this.$progressDaySelect.innerHTML='<option value="">Select workout day...</option>'+this.days.map(e=>`<option value="${e.id}">${e.display_name}</option>`).join(""))}async loadDayProgress(){if(!this.$progressDaySelect||!this.$progressCharts)return;let e=this.$progressDaySelect.value;if(!e){this.$progressCharts.innerHTML="",this.destroyProgressCharts();return}let t=await d.getDayExercises(parseInt(e));if(t.length===0){this.$progressCharts.innerHTML='<p class="no-data">No exercises for this day</p>';return}this.destroyProgressCharts(),this.$progressCharts.innerHTML=t.map(s=>`
+      <div class="progress-exercise" id="progress-exercise-${s.id}">
+        <h3 class="progress-exercise-name">${s.name}</h3>
+        <div class="progress-exercise-charts">
+          <canvas id="weight-chart-${s.id}"></canvas>
+          <canvas id="reps-chart-${s.id}"></canvas>
+        </div>
+      </div>
+    `).join("");for(let s of t){let i=await d.getProgress(s.id);if(i.length>0)this.renderExerciseCharts(s.id,s.name,i);else{let n=document.getElementById(`progress-exercise-${s.id}`)?.querySelector(".progress-exercise-charts");n&&(n.innerHTML='<p class="no-data">No data yet</p>')}}}destroyProgressCharts(){for(let e of this.progressCharts)e.destroy();this.progressCharts=[]}renderExerciseCharts(e,t,s){let i=s.map(l=>l.date),a=s.map(l=>l.maxWeight),n=s.map(l=>l.totalReps),o={responsive:!0,plugins:{legend:{display:!1},title:{display:!0,color:"#888888",font:{family:"Outfit",weight:"500",size:12}}},scales:{x:{ticks:{color:"#555555",font:{family:"Outfit",size:10}},grid:{color:"#1a1a1a"}},y:{ticks:{color:"#555555",font:{family:"Outfit",size:10}},grid:{color:"#1a1a1a"}}}},c=document.getElementById(`weight-chart-${e}`);if(c){let l=new Chart(c,{type:"line",data:{labels:i,datasets:[{label:"Max Weight (kg)",data:a,borderColor:"#22c55e",backgroundColor:"rgba(34, 197, 94, 0.1)",fill:!0,tension:.3,pointBackgroundColor:"#22c55e",pointBorderColor:"#22c55e",pointRadius:3}]},options:{...o,plugins:{...o.plugins,title:{...o.plugins.title,text:"Weight"}}}});this.progressCharts.push(l)}let m=document.getElementById(`reps-chart-${e}`);if(m){let l=new Chart(m,{type:"line",data:{labels:i,datasets:[{label:"Total Reps",data:n,borderColor:"#3b82f6",backgroundColor:"rgba(59, 130, 246, 0.1)",fill:!0,tension:.3,pointBackgroundColor:"#3b82f6",pointBorderColor:"#3b82f6",pointRadius:3}]},options:{...o,plugins:{...o.plugins,title:{...o.plugins.title,text:"Reps"}}}});this.progressCharts.push(l)}}async showMeasurements(){await this.loadMeasurements(),await new Promise(e=>requestAnimationFrame(e)),this.showScreen("measurements-screen",!0,!0),this.updateUrl("measurements-screen")}async loadMeasurements(){let[e,t]=await Promise.all([d.getMeasurements(),d.getLatestMeasurement()]);if(this.$measurementsSummary&&t){let s=g.filter(i=>t[i.key]!==null).slice(0,5).map(i=>`<div class="measurement-stat"><span class="stat-value">${t[i.key]}</span><span class="stat-label">${i.unit} ${i.label.toLowerCase()}</span></div>`).join("");this.$measurementsSummary.innerHTML=`
+        <div class="measurement-summary-card">
+          <div class="measurement-summary-date">Last: ${new Date(t.measured_at).toLocaleDateString()}</div>
+          <div class="measurement-summary-stats">${s}</div>
+        </div>
+      `}else this.$measurementsSummary&&(this.$measurementsSummary.innerHTML="");await this.renderMeasurementCharts(e),this.$measurementsHistory&&(e.length===0?this.$measurementsHistory.innerHTML='<p class="no-data">No measurements yet</p>':this.$measurementsHistory.innerHTML=e.map(s=>{let i=g.filter(a=>s[a.key]!==null).slice(0,2).map(a=>`${s[a.key]} ${a.unit}`).join(" \u2022 ")||"Measurements recorded";return`
+            <div class="measurement-history-item" onclick="app.showMeasurementDetail(${s.id})">
+              <div class="measurement-history-date">${new Date(s.measured_at).toLocaleDateString()}</div>
+              <div class="measurement-history-details">${i}</div>
             </div>
-          `;
-                }).join('');
-            }
-        }
-    }
-    async renderMeasurementCharts(measurements) {
-        if (measurements.length === 0 || !this.$measurementsCharts) {
-            if (this.$measurementsCharts)
-                this.$measurementsCharts.innerHTML = '';
-            return;
-        }
-        this.destroyMeasurementCharts();
-        const sorted = [...measurements].sort((a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime());
-        const labels = sorted.map(m => new Date(m.measured_at).toLocaleDateString());
-        // Use config to build charts
-        const chartsToRender = MEASUREMENT_FIELDS.filter(f => {
-            const values = sorted.map(m => m[f.key]);
-            return values.some(v => v !== null);
-        });
-        this.$measurementsCharts.innerHTML = chartsToRender
-            .map(f => `<div class="measurement-chart"><h3>${f.label} (${f.unit})</h3><canvas id="chart-${f.key}"></canvas></div>`)
-            .join('');
-        for (const field of chartsToRender) {
-            const values = sorted.map(m => m[field.key]);
-            const ctx = document.getElementById(`chart-${field.key}`);
-            if (ctx) {
-                const chart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels,
-                        datasets: [{
-                                label: `${field.label} (${field.unit})`,
-                                data: values,
-                                borderColor: field.color,
-                                backgroundColor: field.color + '1A',
-                                fill: true,
-                                tension: 0.3,
-                                spanGaps: true,
-                                pointBackgroundColor: field.color,
-                                pointBorderColor: field.color,
-                                pointRadius: 3
-                            }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: {
-                                ticks: { color: '#555555', font: { family: 'Outfit', size: 10 } },
-                                grid: { color: '#1a1a1a' }
-                            },
-                            y: {
-                                ticks: { color: '#555555', font: { family: 'Outfit', size: 10 } },
-                                grid: { color: '#1a1a1a' }
-                            }
-                        }
-                    }
-                });
-                this.measurementCharts.push(chart);
-            }
-        }
-    }
-    destroyMeasurementCharts() {
-        for (const chart of this.measurementCharts) {
-            chart.destroy();
-        }
-        this.measurementCharts = [];
-    }
-    async showMeasurementDetail(id) {
-        this.viewingMeasurementId = id;
-        await this.loadMeasurementDetail(id);
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        this.showScreen('measurement-detail-screen', true, true); // skipClear: content already loaded
-        this.updateUrl('measurement-detail-screen', { id: id.toString() });
-    }
-    async loadMeasurementDetail(id) {
-        const m = await api.getMeasurement(id);
-        if (this.$measurementDetailTitle) {
-            this.$measurementDetailTitle.textContent = new Date(m.measured_at).toLocaleDateString();
-        }
-        if (this.$measurementDetailContent) {
-            // Use config to build detail rows
-            const rows = MEASUREMENT_FIELDS
-                .filter(f => m[f.key] !== null)
-                .map(f => `<div class="detail-row"><span class="detail-label">${f.label}</span><span class="detail-value">${m[f.key]} ${f.unit}</span></div>`)
-                .join('');
-            let html = `<div class="measurement-detail-rows">${rows || '<p class="no-data">No measurements recorded</p>'}</div>`;
-            if (m.notes) {
-                html += `<div class="measurement-notes-display"><strong>Notes:</strong> ${m.notes}</div>`;
-            }
-            html += `<button class="edit-measurement-btn" onclick="app.editMeasurement(${m.id})">Edit</button>`;
-            this.$measurementDetailContent.innerHTML = html;
-        }
-    }
-    renderMeasurementForm() {
-        if (!this.$measurementFormFields)
-            return;
-        const sections = {
-            main: [],
-            upper: [],
-            core: [],
-            lower: []
-        };
-        MEASUREMENT_FIELDS.forEach(f => sections[f.section].push(f));
-        const renderSection = (title, fields) => {
-            if (fields.length === 0)
-                return '';
-            const inputs = fields.map(f => `
+          `}).join(""))}async renderMeasurementCharts(e){if(e.length===0||!this.$measurementsCharts){this.$measurementsCharts&&(this.$measurementsCharts.innerHTML="");return}this.destroyMeasurementCharts();let t=[...e].sort((a,n)=>new Date(a.measured_at).getTime()-new Date(n.measured_at).getTime()),s=t.map(a=>new Date(a.measured_at).toLocaleDateString()),i=g.filter(a=>t.map(o=>o[a.key]).some(o=>o!==null));this.$measurementsCharts.innerHTML=i.map(a=>`<div class="measurement-chart"><h3>${a.label} (${a.unit})</h3><canvas id="chart-${a.key}"></canvas></div>`).join("");for(let a of i){let n=t.map(c=>c[a.key]),o=document.getElementById(`chart-${a.key}`);if(o){let c=new Chart(o,{type:"line",data:{labels:s,datasets:[{label:`${a.label} (${a.unit})`,data:n,borderColor:a.color,backgroundColor:a.color+"1A",fill:!0,tension:.3,spanGaps:!0,pointBackgroundColor:a.color,pointBorderColor:a.color,pointRadius:3}]},options:{responsive:!0,plugins:{legend:{display:!1}},scales:{x:{ticks:{color:"#555555",font:{family:"Outfit",size:10}},grid:{color:"#1a1a1a"}},y:{ticks:{color:"#555555",font:{family:"Outfit",size:10}},grid:{color:"#1a1a1a"}}}}});this.measurementCharts.push(c)}}}destroyMeasurementCharts(){for(let e of this.measurementCharts)e.destroy();this.measurementCharts=[]}async showMeasurementDetail(e){this.viewingMeasurementId=e,await this.loadMeasurementDetail(e),await new Promise(t=>requestAnimationFrame(t)),this.showScreen("measurement-detail-screen",!0,!0),this.updateUrl("measurement-detail-screen",{id:e.toString()})}async loadMeasurementDetail(e){let t=await d.getMeasurement(e);if(this.$measurementDetailTitle&&(this.$measurementDetailTitle.textContent=new Date(t.measured_at).toLocaleDateString()),this.$measurementDetailContent){let i=`<div class="measurement-detail-rows">${g.filter(a=>t[a.key]!==null).map(a=>`<div class="detail-row"><span class="detail-label">${a.label}</span><span class="detail-value">${t[a.key]} ${a.unit}</span></div>`).join("")||'<p class="no-data">No measurements recorded</p>'}</div>`;t.notes&&(i+=`<div class="measurement-notes-display"><strong>Notes:</strong> ${t.notes}</div>`),i+=`<button class="edit-measurement-btn" onclick="app.editMeasurement(${t.id})">Edit</button>`,this.$measurementDetailContent.innerHTML=i}}renderMeasurementForm(){if(!this.$measurementFormFields)return;let e={main:[],upper:[],core:[],lower:[]};g.forEach(s=>e[s.section].push(s));let t=(s,i)=>{if(i.length===0)return"";let a=i.map(n=>`
         <label class="measurement-input-group">
-          <span>${f.label} (${f.unit})</span>
-          <input type="number" id="measurement-${f.key}" step="0.1" inputmode="decimal">
+          <span>${n.label} (${n.unit})</span>
+          <input type="number" id="measurement-${n.key}" step="0.1" inputmode="decimal">
         </label>
-      `).join('');
-            return title
-                ? `<h3 class="measurement-section-title">${title}</h3><div class="measurement-form-grid">${inputs}</div>`
-                : `<div class="measurement-form-grid">${inputs}</div>`;
-        };
-        this.$measurementFormFields.innerHTML =
-            renderSection('', sections.main) +
-                renderSection('Upper Body', sections.upper) +
-                renderSection('Core', sections.core) +
-                renderSection('Lower Body', sections.lower);
-    }
-    showAddMeasurement() {
-        document.getElementById('measurement-modal-title').textContent = 'Add Measurement';
-        document.getElementById('measurement-id').value = '';
-        this.renderMeasurementForm();
-        document.getElementById('measurement-notes').value = '';
-        this.$measurementModal?.classList.remove('hidden');
-    }
-    async editMeasurement(id) {
-        const m = await api.getMeasurement(id);
-        document.getElementById('measurement-modal-title').textContent = 'Edit Measurement';
-        document.getElementById('measurement-id').value = id.toString();
-        this.renderMeasurementForm();
-        // Populate form using config
-        MEASUREMENT_FIELDS.forEach(f => {
-            const input = document.getElementById(`measurement-${f.key}`);
-            if (input)
-                input.value = m[f.key]?.toString() || '';
-        });
-        document.getElementById('measurement-notes').value = m.notes || '';
-        this.$measurementModal?.classList.remove('hidden');
-    }
-    closeMeasurementModal() {
-        this.$measurementModal?.classList.add('hidden');
-    }
-    async saveMeasurement(event) {
-        event.preventDefault();
-        const id = document.getElementById('measurement-id').value;
-        // Build data object using config
-        const data = {
-            measured_at: new Date().toISOString(),
-            notes: document.getElementById('measurement-notes').value || null
-        };
-        MEASUREMENT_FIELDS.forEach(f => {
-            const input = document.getElementById(`measurement-${f.key}`);
-            data[f.key] = input?.value ? parseFloat(input.value) : null;
-        });
-        try {
-            if (id) {
-                await api.updateMeasurement(parseInt(id), data);
-                this.closeMeasurementModal();
-                if (this.viewingMeasurementId) {
-                    await this.loadMeasurementDetail(this.viewingMeasurementId);
-                }
-            }
-            else {
-                await api.createMeasurement(data);
-                this.closeMeasurementModal();
-                await this.loadMeasurements();
-            }
-        }
-        catch (err) {
-            alert('Failed to save measurement');
-            console.error(err);
-        }
-    }
-    async deleteMeasurement() {
-        if (!this.viewingMeasurementId)
-            return;
-        if (!confirm('Delete this measurement? This cannot be undone.'))
-            return;
-        try {
-            await api.deleteMeasurement(this.viewingMeasurementId);
-            this.viewingMeasurementId = null;
-            this.navigationStack = this.navigationStack.filter(s => s !== 'measurement-detail-screen');
-            this.goBack();
-        }
-        catch (err) {
-            alert('Failed to delete measurement');
-            console.error(err);
-        }
-    }
-    // ===================
-    // Manage Exercises
-    // ===================
-    async showManage() {
-        await this.loadManageDaySelect();
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        this.showScreen('manage-screen', true, true); // skipClear: content already loaded
-        this.updateUrl('manage-screen');
-    }
-    async loadManageDaySelect() {
-        if (this.$manageDaySelect) {
-            this.$manageDaySelect.innerHTML = '<option value="">Select workout day...</option>' +
-                this.days.map(d => `<option value="${d.id}">${d.display_name}</option>`).join('');
-        }
-        if (this.$manageExerciseList)
-            this.$manageExerciseList.innerHTML = '';
-        this.$addExerciseBtn?.classList.add('hidden');
-    }
-    async loadDayExercises() {
-        if (!this.$manageDaySelect)
-            return;
-        const dayId = this.$manageDaySelect.value;
-        if (!dayId) {
-            if (this.$manageExerciseList)
-                this.$manageExerciseList.innerHTML = '';
-            this.$addExerciseBtn?.classList.add('hidden');
-            return;
-        }
-        const exercises = await api.getDayExercises(parseInt(dayId));
-        if (this.$manageExerciseList) {
-            this.$manageExerciseList.innerHTML = exercises.map(ex => templates.renderManageExercise(ex)).join('');
-        }
-        this.$addExerciseBtn?.classList.remove('hidden');
-    }
-    // ===================
-    // Add/Edit Exercise Modal
-    // ===================
-    showAddExercise() {
-        const dayId = this.$manageDaySelect?.value;
-        if (!dayId)
-            return;
-        document.getElementById('modal-title').textContent = 'Add Exercise';
-        document.getElementById('exercise-id').value = '';
-        document.getElementById('exercise-day-id').value = dayId;
-        document.getElementById('exercise-name').value = '';
-        document.getElementById('exercise-weight').value = '';
-        this.setGroups = [{ count: 3, reps: 10, isDropset: false }];
-        this.renderSetGroups();
-        this.$exerciseModal?.classList.remove('hidden');
-    }
-    async editExercise(id) {
-        const exercise = await api.getExercise(id);
-        document.getElementById('modal-title').textContent = 'Edit Exercise';
-        document.getElementById('exercise-id').value = id.toString();
-        document.getElementById('exercise-day-id').value = exercise.day_id.toString();
-        document.getElementById('exercise-name').value = exercise.name;
-        document.getElementById('exercise-weight').value = exercise.default_weight?.toString() || '';
-        this.setGroups = this.parseDescriptionToGroups(exercise.description);
-        this.renderSetGroups();
-        this.$exerciseModal?.classList.remove('hidden');
-    }
-    closeModal() {
-        this.$exerciseModal?.classList.add('hidden');
-    }
-    async saveExercise(event) {
-        event.preventDefault();
-        const id = document.getElementById('exercise-id').value;
-        const dayId = parseInt(document.getElementById('exercise-day-id').value);
-        const name = document.getElementById('exercise-name').value;
-        const description = this.generateDescription() || null;
-        const defaultWeight = parseFloat(document.getElementById('exercise-weight').value) || null;
-        try {
-            if (id) {
-                await api.updateExercise(parseInt(id), name, description, defaultWeight);
-            }
-            else {
-                await api.createExercise(dayId, name, description, defaultWeight);
-            }
-            this.closeModal();
-            await this.loadDayExercises();
-        }
-        catch (err) {
-            alert('Failed to save exercise');
-            console.error(err);
-        }
-    }
-    async deleteExercise(id) {
-        if (!confirm('Delete this exercise?'))
-            return;
-        try {
-            await api.deleteExercise(id);
-            await this.loadDayExercises();
-        }
-        catch (err) {
-            alert('Failed to delete exercise');
-            console.error(err);
-        }
-    }
-    // ===================
-    // Set Group Builder
-    // ===================
-    parseDescriptionToGroups(description) {
-        if (!description)
-            return [{ count: 3, reps: 10, isDropset: false }];
-        const groups = [];
-        const parts = description.split(',').map(p => p.trim());
-        for (const part of parts) {
-            const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)/i);
-            if (match) {
-                const count = parseInt(match[1]);
-                const repsStr = match[2].toLowerCase();
-                if (repsStr === 'max') {
-                    groups.push({ count, reps: 'max', isDropset: false });
-                }
-                else if (repsStr.includes('-')) {
-                    const dropCount = repsStr.split('-').length;
-                    const reps = parseInt(repsStr.split('-')[0]);
-                    groups.push({ count, reps, isDropset: true, dropsetCount: dropCount });
-                }
-                else {
-                    groups.push({ count, reps: parseInt(repsStr), isDropset: false });
-                }
-                const noteMatch = part.match(/\(([^)]+)\)/);
-                if (noteMatch && groups.length > 0) {
-                    groups[groups.length - 1].note = noteMatch[1];
-                }
-            }
-        }
-        return groups.length > 0 ? groups : [{ count: 3, reps: 10, isDropset: false }];
-    }
-    renderSetGroups() {
-        const container = document.getElementById('set-groups');
-        if (!container)
-            return;
-        container.innerHTML = this.setGroups.map((group, index) => `
-      <div class="set-group" data-index="${index}">
-        <input type="number" class="set-count" value="${group.count}" min="1" max="10"
-          onchange="app.updateSetGroup(${index}, 'count', this.value)">
+      `).join("");return s?`<h3 class="measurement-section-title">${s}</h3><div class="measurement-form-grid">${a}</div>`:`<div class="measurement-form-grid">${a}</div>`};this.$measurementFormFields.innerHTML=t("",e.main)+t("Upper Body",e.upper)+t("Core",e.core)+t("Lower Body",e.lower)}showAddMeasurement(){document.getElementById("measurement-modal-title").textContent="Add Measurement",document.getElementById("measurement-id").value="",this.renderMeasurementForm(),document.getElementById("measurement-notes").value="",this.$measurementModal?.classList.remove("hidden")}async editMeasurement(e){let t=await d.getMeasurement(e);document.getElementById("measurement-modal-title").textContent="Edit Measurement",document.getElementById("measurement-id").value=e.toString(),this.renderMeasurementForm(),g.forEach(s=>{let i=document.getElementById(`measurement-${s.key}`);i&&(i.value=t[s.key]?.toString()||"")}),document.getElementById("measurement-notes").value=t.notes||"",this.$measurementModal?.classList.remove("hidden")}closeMeasurementModal(){this.$measurementModal?.classList.add("hidden")}async saveMeasurement(e){e.preventDefault();let t=document.getElementById("measurement-id").value,s={measured_at:new Date().toISOString(),notes:document.getElementById("measurement-notes").value||null};g.forEach(i=>{let a=document.getElementById(`measurement-${i.key}`);s[i.key]=a?.value?parseFloat(a.value):null});try{t?(await d.updateMeasurement(parseInt(t),s),this.closeMeasurementModal(),this.viewingMeasurementId&&await this.loadMeasurementDetail(this.viewingMeasurementId)):(await d.createMeasurement(s),this.closeMeasurementModal(),await this.loadMeasurements())}catch(i){alert("Failed to save measurement"),console.error(i)}}async deleteMeasurement(){if(this.viewingMeasurementId&&confirm("Delete this measurement? This cannot be undone."))try{await d.deleteMeasurement(this.viewingMeasurementId),this.viewingMeasurementId=null,this.navigationStack=this.navigationStack.filter(e=>e!=="measurement-detail-screen"),this.goBack()}catch(e){alert("Failed to delete measurement"),console.error(e)}}async showManage(){await this.loadManageDaySelect(),await new Promise(e=>requestAnimationFrame(e)),this.showScreen("manage-screen",!0,!0),this.updateUrl("manage-screen")}async loadManageDaySelect(){this.$manageDaySelect&&(this.$manageDaySelect.innerHTML='<option value="">Select workout day...</option>'+this.days.map(e=>`<option value="${e.id}">${e.display_name}</option>`).join("")),this.$manageExerciseList&&(this.$manageExerciseList.innerHTML=""),this.$addExerciseBtn?.classList.add("hidden")}async loadDayExercises(){if(!this.$manageDaySelect)return;let e=this.$manageDaySelect.value;if(!e){this.$manageExerciseList&&(this.$manageExerciseList.innerHTML=""),this.$addExerciseBtn?.classList.add("hidden");return}let t=await d.getDayExercises(parseInt(e));this.$manageExerciseList&&(this.$manageExerciseList.innerHTML=t.map(s=>T(s)).join("")),this.$addExerciseBtn?.classList.remove("hidden")}showAddExercise(){let e=this.$manageDaySelect?.value;e&&(document.getElementById("modal-title").textContent="Add Exercise",document.getElementById("exercise-id").value="",document.getElementById("exercise-day-id").value=e,document.getElementById("exercise-name").value="",document.getElementById("exercise-weight").value="",this.setGroups=[{count:3,reps:10,isDropset:!1}],this.renderSetGroups(),this.$exerciseModal?.classList.remove("hidden"))}async editExercise(e){let t=await d.getExercise(e);document.getElementById("modal-title").textContent="Edit Exercise",document.getElementById("exercise-id").value=e.toString(),document.getElementById("exercise-day-id").value=t.day_id.toString(),document.getElementById("exercise-name").value=t.name,document.getElementById("exercise-weight").value=t.default_weight?.toString()||"",this.setGroups=this.parseDescriptionToGroups(t.description),this.renderSetGroups(),this.$exerciseModal?.classList.remove("hidden")}closeModal(){this.$exerciseModal?.classList.add("hidden")}async saveExercise(e){e.preventDefault();let t=document.getElementById("exercise-id").value,s=parseInt(document.getElementById("exercise-day-id").value),i=document.getElementById("exercise-name").value,a=this.generateDescription()||null,n=parseFloat(document.getElementById("exercise-weight").value)||null;try{t?await d.updateExercise(parseInt(t),i,a,n):await d.createExercise(s,i,a,n),this.closeModal(),await this.loadDayExercises()}catch(o){alert("Failed to save exercise"),console.error(o)}}async deleteExercise(e){if(confirm("Delete this exercise?"))try{await d.deleteExercise(e),await this.loadDayExercises()}catch(t){alert("Failed to delete exercise"),console.error(t)}}parseDescriptionToGroups(e){if(!e)return[{count:3,reps:10,isDropset:!1}];let t=[],s=e.split(",").map(i=>i.trim());for(let i of s){let a=i.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)/i);if(a){let n=parseInt(a[1]),o=a[2].toLowerCase();if(o==="max")t.push({count:n,reps:"max",isDropset:!1});else if(o.includes("-")){let m=o.split("-").length,l=parseInt(o.split("-")[0]);t.push({count:n,reps:l,isDropset:!0,dropsetCount:m})}else t.push({count:n,reps:parseInt(o),isDropset:!1});let c=i.match(/\(([^)]+)\)/);c&&t.length>0&&(t[t.length-1].note=c[1])}}return t.length>0?t:[{count:3,reps:10,isDropset:!1}]}renderSetGroups(){let e=document.getElementById("set-groups");e&&(e.innerHTML=this.setGroups.map((t,s)=>`
+      <div class="set-group" data-index="${s}">
+        <input type="number" class="set-count" value="${t.count}" min="1" max="10"
+          onchange="app.updateSetGroup(${s}, 'count', this.value)">
         <span class="set-group-label">x</span>
-        <select class="set-reps-type" onchange="app.updateSetGroup(${index}, 'repsType', this.value)">
-          <option value="number" ${group.reps !== 'max' ? 'selected' : ''}>Reps</option>
-          <option value="max" ${group.reps === 'max' ? 'selected' : ''}>Max</option>
+        <select class="set-reps-type" onchange="app.updateSetGroup(${s}, 'repsType', this.value)">
+          <option value="number" ${t.reps!=="max"?"selected":""}>Reps</option>
+          <option value="max" ${t.reps==="max"?"selected":""}>Max</option>
         </select>
-        ${group.reps !== 'max' ? `
-          <input type="number" class="set-reps" value="${group.reps}" min="1" max="100"
-            onchange="app.updateSetGroup(${index}, 'reps', this.value)">
-        ` : ''}
+        ${t.reps!=="max"?`
+          <input type="number" class="set-reps" value="${t.reps}" min="1" max="100"
+            onchange="app.updateSetGroup(${s}, 'reps', this.value)">
+        `:""}
         <label class="dropset-toggle">
-          <input type="checkbox" ${group.isDropset ? 'checked' : ''}
-            onchange="app.updateSetGroup(${index}, 'isDropset', this.checked)">
+          <input type="checkbox" ${t.isDropset?"checked":""}
+            onchange="app.updateSetGroup(${s}, 'isDropset', this.checked)">
           Drop
         </label>
-        ${group.isDropset ? `
-          <input type="number" class="dropset-count" value="${group.dropsetCount || 3}" min="2" max="5"
+        ${t.isDropset?`
+          <input type="number" class="dropset-count" value="${t.dropsetCount||3}" min="2" max="5"
             placeholder="drops"
-            onchange="app.updateSetGroup(${index}, 'dropsetCount', this.value)">
-        ` : ''}
-        <button type="button" class="remove-set-group" onclick="app.removeSetGroup(${index})">×</button>
+            onchange="app.updateSetGroup(${s}, 'dropsetCount', this.value)">
+        `:""}
+        <button type="button" class="remove-set-group" onclick="app.removeSetGroup(${s})">\xD7</button>
       </div>
-    `).join('');
-        this.updateDescriptionPreview();
-    }
-    addSetGroup() {
-        this.setGroups.push({ count: 1, reps: 10, isDropset: false });
-        this.renderSetGroups();
-    }
-    removeSetGroup(index) {
-        if (this.setGroups.length <= 1)
-            return;
-        this.setGroups.splice(index, 1);
-        this.renderSetGroups();
-    }
-    updateSetGroup(index, field, value) {
-        const group = this.setGroups[index];
-        if (!group)
-            return;
-        switch (field) {
-            case 'count':
-                group.count = parseInt(value) || 1;
-                break;
-            case 'reps':
-                group.reps = parseInt(value) || 10;
-                break;
-            case 'repsType':
-                group.reps = value === 'max' ? 'max' : 10;
-                break;
-            case 'isDropset':
-                group.isDropset = value;
-                if (value && !group.dropsetCount)
-                    group.dropsetCount = 3;
-                break;
-            case 'dropsetCount':
-                group.dropsetCount = parseInt(value) || 3;
-                break;
-        }
-        this.renderSetGroups();
-    }
-    updateDescriptionPreview() {
-        const preview = document.getElementById('description-preview-text');
-        if (preview) {
-            preview.textContent = this.generateDescription() || 'No sets defined';
-        }
-    }
-    generateDescription() {
-        return this.setGroups.map(group => {
-            let repsStr;
-            if (group.reps === 'max') {
-                repsStr = 'max';
-            }
-            else if (group.isDropset && group.dropsetCount) {
-                repsStr = Array(group.dropsetCount).fill(group.reps).join('-');
-            }
-            else {
-                repsStr = group.reps.toString();
-            }
-            let part = `${group.count}x${repsStr}`;
-            if (group.note)
-                part += ` (${group.note})`;
-            return part;
-        }).join(', ');
-    }
-}
-// Route definitions: screen -> URL path
-GymTrackerApp.routes = {
-    'home-screen': '/',
-    'session-screen': '/session',
-    'history-screen': '/history',
-    'session-detail-screen': '/history/:id',
-    'progress-screen': '/progress',
-    'measurements-screen': '/body',
-    'measurement-detail-screen': '/body/:id',
-    'manage-screen': '/manage'
-};
-// Initialize app
-const app = new GymTrackerApp();
-window.app = app;
+    `).join(""),this.updateDescriptionPreview())}addSetGroup(){this.setGroups.push({count:1,reps:10,isDropset:!1}),this.renderSetGroups()}removeSetGroup(e){this.setGroups.length<=1||(this.setGroups.splice(e,1),this.renderSetGroups())}updateSetGroup(e,t,s){let i=this.setGroups[e];if(i){switch(t){case"count":i.count=parseInt(s)||1;break;case"reps":i.reps=parseInt(s)||10;break;case"repsType":i.reps=s==="max"?"max":10;break;case"isDropset":i.isDropset=s,s&&!i.dropsetCount&&(i.dropsetCount=3);break;case"dropsetCount":i.dropsetCount=parseInt(s)||3;break}this.renderSetGroups()}}updateDescriptionPreview(){let e=document.getElementById("description-preview-text");e&&(e.textContent=this.generateDescription()||"No sets defined")}generateDescription(){return this.setGroups.map(e=>{let t;e.reps==="max"?t="max":e.isDropset&&e.dropsetCount?t=Array(e.dropsetCount).fill(e.reps).join("-"):t=e.reps.toString();let s=`${e.count}x${t}`;return e.note&&(s+=` (${e.note})`),s}).join(", ")}},P=new $;window.app=P;})();

@@ -740,9 +740,15 @@ h2 {
   background: var(--accent-dim);
 }
 
-.no-sets {
+.detail-set.add-set {
+  background: transparent;
+  border-style: dashed;
   color: var(--text-muted);
-  font-style: italic;
+}
+
+.detail-set.add-set:active {
+  background: var(--accent-surface);
+  color: var(--accent);
 }
 
 /* ============================================

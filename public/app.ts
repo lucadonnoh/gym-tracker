@@ -27,6 +27,8 @@ class GymTrackerApp {
   private viewingSessionId: number | null = null;
   private viewingMeasurementId: number | null = null;
   private editingSetId: number | null = null;
+  private addingSetExerciseId: number | null = null;
+  private addingSetNumber: number | null = null;
   private setGroups: SetGroup[] = [];
   private navigationStack: string[] = ['home-screen'];
   private currentRouteParams: { [key: string]: string } = {};
@@ -926,21 +928,50 @@ class GymTrackerApp {
   closeEditSetModal(): void {
     this.$editSetModal?.classList.add('hidden');
     this.editingSetId = null;
+    this.addingSetExerciseId = null;
+    this.addingSetNumber = null;
+  }
+
+  openAddSetModal(exerciseId: number, setNumber: number): void {
+    this.addingSetExerciseId = exerciseId;
+    this.addingSetNumber = setNumber;
+    this.editingSetId = null;
+
+    const weightEl = document.getElementById('edit-set-weight') as HTMLInputElement;
+    const repsEl = document.getElementById('edit-set-reps') as HTMLInputElement;
+    const setIdEl = document.getElementById('edit-set-id') as HTMLInputElement;
+
+    if (!weightEl || !repsEl || !setIdEl) return;
+
+    setIdEl.value = '';
+    weightEl.value = '';
+    repsEl.value = '';
+
+    this.$editSetModal?.classList.remove('hidden');
+    weightEl.focus();
   }
 
   async updateSet(event: Event): Promise<void> {
     event.preventDefault();
-    if (!this.editingSetId || !this.viewingSessionId) return;
+    if (!this.viewingSessionId) return;
 
     const weight = parseFloat((document.getElementById('edit-set-weight') as HTMLInputElement).value) || null;
     const reps = parseInt((document.getElementById('edit-set-reps') as HTMLInputElement).value) || null;
 
     try {
-      await api.updateSet(this.editingSetId, weight, reps);
+      if (this.addingSetExerciseId && this.addingSetNumber) {
+        // Adding a new set
+        await api.logSet(this.viewingSessionId, this.addingSetExerciseId, this.addingSetNumber, weight, reps);
+      } else if (this.editingSetId) {
+        // Updating existing set
+        await api.updateSet(this.editingSetId, weight, reps);
+      } else {
+        return;
+      }
       this.closeEditSetModal();
       await this.showSessionDetail(this.viewingSessionId);
     } catch (err) {
-      alert('Failed to update set');
+      alert('Failed to save set');
       console.error(err);
     }
   }

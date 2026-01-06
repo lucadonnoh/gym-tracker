@@ -81,9 +81,8 @@ export function renderSessionDetailExercise(ex: ExerciseWithSets, stats: Exercis
   if (prs.weight) prBadges.push('<span class="pr-badge pr-weight">1RM</span>');
   if (prs.reps) prBadges.push('<span class="pr-badge pr-reps">Reps PR</span>');
 
-  const setsHtml = sets.length > 0
-    ? sets.map(s => `<span class="detail-set" onclick="app.openEditSetModal(${s.id}, ${s.weight ?? 0}, ${s.reps ?? 0})">${s.weight ?? '?'}kg x ${s.reps ?? '?'}</span>`).join(' ')
-    : '<span class="no-sets">No sets logged</span>';
+  const setsHtml = sets.map(s => `<span class="detail-set" onclick="app.openEditSetModal(${s.id}, ${s.weight ?? 0}, ${s.reps ?? 0})">${s.weight ?? '?'}kg x ${s.reps ?? '?'}</span>`).join(' ');
+  const nextSetNumber = sets.length + 1;
 
   return `
     <div class="detail-exercise ${hasPR ? 'has-pr' : ''}">
@@ -92,7 +91,10 @@ export function renderSessionDetailExercise(ex: ExerciseWithSets, stats: Exercis
         <div class="pr-badges">${prBadges.join('')}</div>
       </div>
       <div class="detail-exercise-volume">${volume.toLocaleString()} kg</div>
-      <div class="detail-sets">${setsHtml}</div>
+      <div class="detail-sets">
+        ${setsHtml}
+        <span class="detail-set add-set" onclick="app.openAddSetModal(${ex.id}, ${nextSetNumber})">+ Add</span>
+      </div>
     </div>
   `;
 }
