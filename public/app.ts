@@ -1763,7 +1763,8 @@ class GymTrackerApp {
   }
 
   closeModal(): void {
-    this.$exerciseModal?.classList.add('hidden');
+    // Close all modals
+    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
   }
 
   async saveExercise(event: Event): Promise<void> {
