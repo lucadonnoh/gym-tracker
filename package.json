@@ -7,7 +7,9 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "seed": "tsx src/seed.ts",
-    "build:frontend": "esbuild public/app.ts --bundle --outfile=public/app.js --minify"
+    "build:frontend": "esbuild public/app.ts --bundle --outfile=public/app.js --minify",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -24,8 +26,11 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^22.10.2",
+    "@types/supertest": "^6.0.3",
     "esbuild": "^0.24.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.0.16"
   }
 }
