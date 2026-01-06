@@ -470,8 +470,10 @@ class GymTrackerApp {
   async logSetWeight(exerciseId: number, setNumber: number, weight: string, reps: string | number | null, isDropset: boolean = false): Promise<void> {
     if (!this.currentSession) return;
 
-    const weightNum = parseFloat(weight) || null;
-    const repsNum = typeof reps === 'string' ? (parseInt(reps) || null) : reps;
+    const weightParsed = parseFloat(weight);
+    const weightNum = isNaN(weightParsed) ? null : weightParsed;
+    const repsParsed = typeof reps === 'string' ? parseInt(reps) : reps;
+    const repsNum = (typeof repsParsed === 'number' && isNaN(repsParsed)) ? null : repsParsed;
 
     if (weightNum === null) return;
 
@@ -955,8 +957,10 @@ class GymTrackerApp {
     event.preventDefault();
     if (!this.viewingSessionId) return;
 
-    const weight = parseFloat((document.getElementById('edit-set-weight') as HTMLInputElement).value) || null;
-    const reps = parseInt((document.getElementById('edit-set-reps') as HTMLInputElement).value) || null;
+    const weightParsed = parseFloat((document.getElementById('edit-set-weight') as HTMLInputElement).value);
+    const weight = isNaN(weightParsed) ? null : weightParsed;
+    const repsParsed = parseInt((document.getElementById('edit-set-reps') as HTMLInputElement).value);
+    const reps = isNaN(repsParsed) ? null : repsParsed;
 
     try {
       if (this.addingSetExerciseId && this.addingSetNumber) {
