@@ -24,13 +24,16 @@ export function initializeDatabase(): void {
     );
   `);
 
+  // Check if we need to migrate old schema (tables exist but without user_id)
+  const needsMigration = checkAndMigrateSchema();
+
+  // Now create tables - will skip if they exist (after migration added user_id)
   db.exec(`
     CREATE TABLE IF NOT EXISTS workout_days (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      display_name TEXT NOT NULL,
-      UNIQUE(user_id, name)
+      display_name TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS exercises (
@@ -44,7 +47,7 @@ export function initializeDatabase(): void {
 
     CREATE TABLE IF NOT EXISTS sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       day_id INTEGER NOT NULL REFERENCES workout_days(id),
       started_at TEXT NOT NULL,
       ended_at TEXT,
@@ -71,7 +74,7 @@ export function initializeDatabase(): void {
 
     CREATE TABLE IF NOT EXISTS body_measurements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       measured_at TEXT NOT NULL,
       weight REAL,
       chest REAL,
@@ -89,88 +92,82 @@ export function initializeDatabase(): void {
     );
 
     CREATE TABLE IF NOT EXISTS settings (
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       key TEXT NOT NULL,
       value TEXT NOT NULL,
       PRIMARY KEY (user_id, key)
     );
-
-    CREATE INDEX IF NOT EXISTS idx_workout_days_user ON workout_days(user_id);
-    CREATE INDEX IF NOT EXISTS idx_exercises_day ON exercises(day_id);
-    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-    CREATE INDEX IF NOT EXISTS idx_sessions_day ON sessions(day_id);
-    CREATE INDEX IF NOT EXISTS idx_session_exercises_session ON session_exercises(session_id);
-    CREATE INDEX IF NOT EXISTS idx_set_logs_session_exercise ON set_logs(session_exercise_id);
-    CREATE INDEX IF NOT EXISTS idx_body_measurements_user ON body_measurements(user_id);
-    CREATE INDEX IF NOT EXISTS idx_body_measurements_date ON body_measurements(measured_at);
   `);
+
+  // Create indexes only after schema is ready (including migrated columns)
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_workout_days_user ON workout_days(user_id)`);
+  } catch {}
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_exercises_day ON exercises(day_id)`);
+  } catch {}
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`);
+  } catch {}
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_day ON sessions(day_id)`);
+  } catch {}
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_session_exercises_session ON session_exercises(session_id)`);
+  } catch {}
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_set_logs_session_exercise ON set_logs(session_exercise_id)`);
+  } catch {}
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_body_measurements_user ON body_measurements(user_id)`);
+  } catch {}
+  try {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_body_measurements_date ON body_measurements(measured_at)`);
+  } catch {}
 }
 
-// Run migration for existing data
+// Check if tables exist without user_id and add the column
+function checkAndMigrateSchema(): boolean {
+  // Check if workout_days exists but doesn't have user_id column
+  const tableInfo = db.prepare("PRAGMA table_info(workout_days)").all() as { name: string }[];
+  if (tableInfo.length > 0 && !tableInfo.some(col => col.name === 'user_id')) {
+    console.log('Detected old schema, adding user_id columns...');
+    try { db.exec('ALTER TABLE workout_days ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+    try { db.exec('ALTER TABLE sessions ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+    try { db.exec('ALTER TABLE body_measurements ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
+    return true;
+  }
+  return false;
+}
+
+// Run migration for existing data - creates donnoh user and assigns orphaned data
 export function migrateExistingData(): void {
-  // Check if migration is needed (users table empty or old schema)
   const userCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
 
   if (userCount === 0) {
-    // Check if there's existing data in old schema (workout_days without user_id)
-    try {
-      const oldDays = db.prepare('SELECT COUNT(*) as count FROM workout_days WHERE user_id IS NULL').get() as { count: number };
-      if (oldDays.count > 0) {
-        console.log('Migrating existing data to user "donnoh"...');
+    // Check if there's existing data that needs to be assigned to a user
+    const orphanedDays = (db.prepare('SELECT COUNT(*) as count FROM workout_days WHERE user_id IS NULL').get() as { count: number }).count;
 
-        // Create donnoh user
-        const passwordHash = bcrypt.hashSync('1234', BCRYPT_ROUNDS);
-        const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('donnoh', passwordHash);
-        const userId = Number(result.lastInsertRowid);
+    if (orphanedDays > 0) {
+      console.log('Migrating existing data to user "donnoh"...');
 
-        // Update all existing data
-        db.prepare('UPDATE workout_days SET user_id = ? WHERE user_id IS NULL').run(userId);
-        db.prepare('UPDATE sessions SET user_id = ? WHERE user_id IS NULL').run(userId);
-        db.prepare('UPDATE body_measurements SET user_id = ? WHERE user_id IS NULL').run(userId);
+      // Create donnoh user
+      const passwordHash = bcrypt.hashSync('1234', BCRYPT_ROUNDS);
+      const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('donnoh', passwordHash);
+      const userId = Number(result.lastInsertRowid);
 
-        // Migrate settings
+      // Update all existing data to belong to donnoh
+      db.prepare('UPDATE workout_days SET user_id = ? WHERE user_id IS NULL').run(userId);
+      db.prepare('UPDATE sessions SET user_id = ? WHERE user_id IS NULL').run(userId);
+      db.prepare('UPDATE body_measurements SET user_id = ? WHERE user_id IS NULL').run(userId);
+
+      // Migrate settings
+      try {
         const oldSettings = db.prepare('SELECT key, value FROM settings WHERE user_id IS NULL').all() as { key: string; value: string }[];
         for (const s of oldSettings) {
           db.prepare('INSERT OR REPLACE INTO settings (user_id, key, value) VALUES (?, ?, ?)').run(userId, s.key, s.value);
         }
         db.prepare('DELETE FROM settings WHERE user_id IS NULL').run();
-
-        console.log('Migration complete!');
-      }
-    } catch {
-      // Old schema doesn't have user_id column yet, need to add it
-      console.log('Adding user_id columns and migrating data...');
-
-      // Create donnoh user first
-      const passwordHash = bcrypt.hashSync('1234', BCRYPT_ROUNDS);
-      const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('donnoh', passwordHash);
-      const userId = Number(result.lastInsertRowid);
-
-      // Add user_id columns if they don't exist
-      try { db.exec('ALTER TABLE workout_days ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
-      try { db.exec('ALTER TABLE sessions ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
-      try { db.exec('ALTER TABLE body_measurements ADD COLUMN user_id INTEGER REFERENCES users(id)'); } catch {}
-
-      // Update all existing data
-      db.prepare('UPDATE workout_days SET user_id = ? WHERE user_id IS NULL').run(userId);
-      db.prepare('UPDATE sessions SET user_id = ? WHERE user_id IS NULL').run(userId);
-      db.prepare('UPDATE body_measurements SET user_id = ? WHERE user_id IS NULL').run(userId);
-
-      // Migrate settings table to include user_id
-      try {
-        const oldSettings = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
-        db.exec('DROP TABLE settings');
-        db.exec(`
-          CREATE TABLE settings (
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            key TEXT NOT NULL,
-            value TEXT NOT NULL,
-            PRIMARY KEY (user_id, key)
-          )
-        `);
-        for (const s of oldSettings) {
-          db.prepare('INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?)').run(userId, s.key, s.value);
-        }
       } catch {}
 
       console.log('Migration complete!');
