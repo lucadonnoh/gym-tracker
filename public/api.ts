@@ -135,6 +135,10 @@ class Api {
     return this.get('/api/days');
   }
 
+  async createDay(name: string, displayName: string): Promise<WorkoutDay | { error: string }> {
+    return this.post('/api/days', { name, display_name: displayName });
+  }
+
   async getDayExercises(dayId: number): Promise<Exercise[]> {
     return this.get(`/api/days/${dayId}/exercises`);
   }

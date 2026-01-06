@@ -13,6 +13,7 @@ import {
   getUserById,
   getAllDays,
   getDayById,
+  createDay,
   getExercisesByDay,
   getExerciseById,
   createExercise,
@@ -168,6 +169,22 @@ app.get('/api/days/:id', authMiddleware, (req: AuthRequest, res: Response) => {
 
 app.get('/api/days/:id/exercises', authMiddleware, (req: AuthRequest, res: Response) => {
   res.json(getExercisesByDay(Number(req.params.id), req.user!.id));
+});
+
+app.post('/api/days', authMiddleware, (req: AuthRequest, res: Response) => {
+  const { name, display_name } = req.body;
+  if (!name || !display_name) {
+    return res.status(400).json({ error: 'Name and display_name are required' });
+  }
+  try {
+    const day = createDay(req.user!.id, name, display_name);
+    res.status(201).json(day);
+  } catch (e: any) {
+    if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      return res.status(400).json({ error: 'A workout day with this name already exists' });
+    }
+    throw e;
+  }
 });
 
 // Exercises

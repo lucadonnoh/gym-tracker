@@ -755,6 +755,38 @@ h2 {
 /* ============================================
    Progress & Manage Screens
    ============================================ */
+.manage-day-row {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.manage-day-row select {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+#add-day-btn {
+  padding: 0.875rem 1rem;
+  background: var(--accent);
+  color: var(--black);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#add-day-btn:active {
+  opacity: 0.8;
+}
+
+.form-error {
+  color: var(--danger);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-md);
+}
+
 #progress-day-select,
 #manage-day-select {
   width: 100%;

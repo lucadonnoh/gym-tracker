@@ -1682,6 +1682,52 @@ class GymTrackerApp {
   }
 
   // ===================
+  // Add Workout Day
+  // ===================
+
+  showAddDay(): void {
+    (document.getElementById('day-display-name') as HTMLInputElement).value = '';
+    document.getElementById('day-error')?.classList.add('hidden');
+    document.getElementById('day-modal')?.classList.remove('hidden');
+  }
+
+  async saveDay(event: Event): Promise<void> {
+    event.preventDefault();
+
+    const displayNameInput = document.getElementById('day-display-name') as HTMLInputElement;
+    const errorDiv = document.getElementById('day-error');
+    const displayName = displayNameInput.value.trim();
+
+    if (!displayName) return;
+
+    // Generate a slug-style name from the display name
+    const name = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+
+    const result = await api.createDay(name, displayName);
+
+    if ('error' in result) {
+      if (errorDiv) {
+        errorDiv.textContent = result.error;
+        errorDiv.classList.remove('hidden');
+      }
+      return;
+    }
+
+    // Refresh days list
+    this.days = await api.getDays();
+    this.renderDayButtons();
+    await this.loadManageDaySelect();
+
+    // Select the new day
+    if (this.$manageDaySelect) {
+      this.$manageDaySelect.value = result.id.toString();
+      await this.loadDayExercises();
+    }
+
+    this.closeModal();
+  }
+
+  // ===================
   // Add/Edit Exercise Modal
   // ===================
 

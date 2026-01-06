@@ -123,9 +123,12 @@
         <h1>Manage</h1>
       </header>
       <main>
-        <select id="manage-day-select" onchange="app.loadDayExercises()">
-          <option value="">Select workout day...</option>
-        </select>
+        <div class="manage-day-row">
+          <select id="manage-day-select" onchange="app.loadDayExercises()">
+            <option value="">Select workout day...</option>
+          </select>
+          <button id="add-day-btn" onclick="app.showAddDay()">+ Day</button>
+        </div>
         <div id="manage-exercise-list"></div>
         <button id="add-exercise-btn" class="hidden" onclick="app.showAddExercise()">+ Add Exercise</button>
       </main>
@@ -203,6 +206,24 @@
             <div id="description-preview-text"></div>
           </div>
 
+          <div class="modal-actions">
+            <button type="button" onclick="app.closeModal()">Cancel</button>
+            <button type="submit">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Day Modal -->
+    <div id="day-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Add Workout Day</h2>
+        <form id="day-form" onsubmit="app.saveDay(event)">
+          <label>
+            Name (e.g., "Chest & Triceps", "Leg Day")
+            <input type="text" id="day-display-name" required placeholder="Display name">
+          </label>
+          <div id="day-error" class="form-error hidden"></div>
           <div class="modal-actions">
             <button type="button" onclick="app.closeModal()">Cancel</button>
             <button type="submit">Save</button>
