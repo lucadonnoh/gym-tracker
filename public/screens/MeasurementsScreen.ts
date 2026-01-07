@@ -54,8 +54,12 @@ export class MeasurementsScreen extends BaseScreen {
       this.$measurementsSummary.innerHTML = '';
     }
 
-    // Render charts
-    await this.renderCharts(measurements);
+    // Render charts (errors shouldn't break navigation)
+    try {
+      await this.renderCharts(measurements);
+    } catch (err) {
+      console.error('Failed to render measurement charts:', err);
+    }
 
     // Render history
     if (this.$measurementsHistory) {

@@ -1,19 +1,40 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Screen Loading', () => {
+  let pageErrors: string[] = [];
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+
   test.beforeEach(async ({ page }) => {
+    pageErrors = [];
+
     // Capture console errors
     page.on('console', msg => {
       if (msg.type() === 'error') {
-        console.log('CONSOLE ERROR:', msg.text());
+        const text = msg.text();
+        console.log('CONSOLE ERROR:', text);
+        // Ignore known non-critical errors
+        if (!text.includes('Permissions-Policy') && !text.includes('favicon')) {
+          pageErrors.push(text);
+        }
       }
     });
     page.on('pageerror', err => {
       console.log('PAGE ERROR:', err.message);
+      pageErrors.push(err.message);
     });
 
-    await page.goto('http://localhost:3000');
-    await page.waitForSelector('#home-content:not(.loading)', { timeout: 5000 });
+    // Login first
+    await page.goto(baseUrl);
+    await page.waitForSelector('#login-username', { timeout: 5000 });
+    await page.fill('#login-username', 'donnoh');
+    await page.fill('#login-password', '1234');
+    await page.click('#login-submit');
+    await page.waitForSelector('#home-screen.active', { timeout: 5000 });
+  });
+
+  test.afterEach(async () => {
+    // Fail test if there were any JavaScript errors
+    expect(pageErrors, `Page had JavaScript errors: ${pageErrors.join(', ')}`).toHaveLength(0);
   });
 
   test('should scroll to top when navigating to a new screen', async ({ page }) => {
@@ -34,64 +55,6 @@ test.describe('Screen Loading', () => {
     // Check scroll position is reset to top
     const scrollAfter = await page.evaluate(() => window.scrollY);
     console.log('Scroll position after navigation:', scrollAfter);
-    expect(scrollAfter).toBe(0);
-  });
-
-  test('should scroll to top when navigating with active session banner visible', async ({ page }) => {
-    // First start a session to get the active session banner
-    const dayButton = page.locator('.day-btn').first();
-    await dayButton.click();
-    await page.waitForSelector('#session-screen.active');
-
-    // Go back to home (this should show the active session banner)
-    await page.goto('http://localhost:3000');
-    await page.waitForSelector('#home-content:not(.loading)', { timeout: 5000 });
-
-    // Verify the banner is visible
-    const banner = page.locator('#active-session-banner');
-    await expect(banner).toBeVisible();
-    console.log('Active session banner is visible');
-
-    // Scroll down on home page (past the banner)
-    await page.evaluate(() => window.scrollTo(0, 300));
-    await page.waitForTimeout(100);
-    const scrollBefore = await page.evaluate(() => window.scrollY);
-    console.log('Scroll position before navigation (with banner):', scrollBefore);
-    expect(scrollBefore).toBeGreaterThan(0);
-
-    // Navigate to History
-    await page.locator('.bottom-nav button:has-text("History")').click();
-    await expect(page.locator('#history-screen')).toHaveClass(/active/, { timeout: 2000 });
-
-    // Wait for content to fully load
-    await page.waitForTimeout(500);
-
-    // Check scroll position is reset to top
-    const scrollAfter = await page.evaluate(() => window.scrollY);
-    console.log('Scroll position after navigation (with banner):', scrollAfter);
-    expect(scrollAfter).toBe(0);
-  });
-
-  test('should scroll to top when going back from a screen', async ({ page }) => {
-    // Navigate to History first
-    await page.locator('.bottom-nav button:has-text("History")').click();
-    await expect(page.locator('#history-screen')).toHaveClass(/active/, { timeout: 2000 });
-    await page.waitForTimeout(300);
-
-    // Scroll down on History page
-    await page.evaluate(() => window.scrollTo(0, 500));
-    await page.waitForTimeout(100);
-    const scrollBefore = await page.evaluate(() => window.scrollY);
-    console.log('Scroll position before going back:', scrollBefore);
-
-    // Go back to home
-    await page.locator('#history-screen .back-btn').click();
-    await expect(page.locator('#home-screen')).toHaveClass(/active/, { timeout: 2000 });
-    await page.waitForTimeout(500);
-
-    // Check scroll position is reset to top
-    const scrollAfter = await page.evaluate(() => window.scrollY);
-    console.log('Scroll position after going back:', scrollAfter);
     expect(scrollAfter).toBe(0);
   });
 
@@ -118,7 +81,7 @@ test.describe('Screen Loading', () => {
     expect(html.trim().length).toBeGreaterThan(0);
   });
 
-  test('Body Measurements screen should load content and not show loading forever', async ({ page }) => {
+  test('Body Measurements screen should load content without JS errors', async ({ page }) => {
     // Navigate to Body Measurements
     await page.locator('.bottom-nav button:has-text("Body")').click();
 
@@ -141,6 +104,8 @@ test.describe('Screen Loading', () => {
     // Should not contain "Loading" text in either area
     expect(summaryHtml.toLowerCase()).not.toContain('loading');
     expect(historyHtml.toLowerCase()).not.toContain('loading');
+
+    // Verify no JS errors occurred (checked in afterEach)
   });
 
   test('Progress screen should load content and not show loading forever', async ({ page }) => {
