@@ -1625,6 +1625,209 @@ h2 {
   border-color: var(--accent);
 }
 
+/* Measurements Summary Grid */
+.measurements-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.metric-card.change-up-good,
+.metric-card.change-down-good {
+  border-color: var(--green);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), transparent);
+}
+
+.metric-card.change-up-bad,
+.metric-card.change-down-bad {
+  border-color: var(--red);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), transparent);
+}
+
+.metric-card.change-up,
+.metric-card.change-down {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.1), transparent);
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-xs);
+}
+
+.metric-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.metric-unit {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-left: 2px;
+}
+
+.metric-change {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  font-size: 0.8125rem;
+}
+
+.metric-change.no-data {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.change-arrow {
+  font-weight: 600;
+}
+
+.metric-card.change-up-good .change-arrow,
+.metric-card.change-down-good .change-arrow {
+  color: var(--green);
+}
+
+.metric-card.change-up-bad .change-arrow,
+.metric-card.change-down-bad .change-arrow {
+  color: var(--red);
+}
+
+.metric-card.change-up .change-arrow,
+.metric-card.change-down .change-arrow {
+  color: var(--accent);
+}
+
+.change-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.change-period {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.last-measured {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-bottom: var(--space-lg);
+}
+
+.measurements-empty-state,
+.charts-empty-state {
+  text-align: center;
+  padding: var(--space-xl) var(--space-md);
+  color: var(--text-secondary);
+}
+
+.measurements-empty-state .hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-top: var(--space-sm);
+}
+
+/* Measurement Charts */
+.chart-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  height: 200px;
+}
+
+.chart-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.chart-container canvas {
+  max-height: 160px;
+}
+
+/* Measurement History */
+.history-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+  color: var(--text-primary);
+}
+
+#measurements-history .history-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+#measurements-history .history-item:active {
+  background: var(--surface-elevated);
+}
+
+.history-item-date {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  min-width: 90px;
+}
+
+.history-item-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+}
+
+.history-weight {
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-change {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.history-change.up {
+  color: var(--accent);
+}
+
+.history-change.down {
+  color: var(--green);
+}
+
+.history-item-secondary {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
 /* ============================================
    Summary Stats - Home Screen
    ============================================ */
