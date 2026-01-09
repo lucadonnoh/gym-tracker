@@ -123,76 +123,43 @@ export class MeasurementsScreen extends BaseScreen {
       changeClass: string;
     }> = [];
 
-    // Weight - most important
-    if (latest.weight !== null) {
-      const change = weekAgo?.weight != null ? latest.weight - weekAgo.weight : null;
-      metrics.push({
-        label: 'Weight',
-        value: latest.weight.toFixed(1),
-        unit: 'kg',
-        change,
-        changeText: change !== null ? `${Math.abs(change).toFixed(1)} kg` : '',
-        changeDirection: change !== null ? (change > 0 ? '↑' : change < 0 ? '↓' : '→') : '',
-        changeClass: change !== null ? (change > 0 ? 'change-up' : change < 0 ? 'change-down' : 'change-neutral') : ''
-      });
-    }
+    // Fields where decrease is good (fat loss indicators)
+    const decreaseIsGood = ['waist', 'hips'];
+    // Fields where change is neutral (depends on goals)
+    const neutralChange = ['weight'];
 
-    // Waist - important for fat loss
-    if (latest.waist !== null) {
-      const change = weekAgo?.waist != null ? latest.waist - weekAgo.waist : null;
-      metrics.push({
-        label: 'Waist',
-        value: latest.waist.toFixed(1),
-        unit: 'cm',
-        change,
-        changeText: change !== null ? `${Math.abs(change).toFixed(1)} cm` : '',
-        changeDirection: change !== null ? (change > 0 ? '↑' : change < 0 ? '↓' : '→') : '',
-        changeClass: change !== null ? (change > 0 ? 'change-up-bad' : change < 0 ? 'change-down-good' : 'change-neutral') : ''
-      });
-    }
+    // Iterate over all measurement fields
+    for (const field of MEASUREMENT_FIELDS) {
+      const value = latest[field.key] as number | null;
+      if (value === null) continue;
 
-    // Chest - important for muscle gain
-    if (latest.chest !== null) {
-      const change = weekAgo?.chest != null ? latest.chest - weekAgo.chest : null;
-      metrics.push({
-        label: 'Chest',
-        value: latest.chest.toFixed(1),
-        unit: 'cm',
-        change,
-        changeText: change !== null ? `${Math.abs(change).toFixed(1)} cm` : '',
-        changeDirection: change !== null ? (change > 0 ? '↑' : change < 0 ? '↓' : '→') : '',
-        changeClass: change !== null ? (change > 0 ? 'change-up-good' : change < 0 ? 'change-down-bad' : 'change-neutral') : ''
-      });
-    }
+      const oldValue = weekAgo?.[field.key] as number | null | undefined;
+      const change = oldValue != null ? value - oldValue : null;
 
-    // Arms average
-    const leftArm = latest.left_arm;
-    const rightArm = latest.right_arm;
-    if (leftArm !== null || rightArm !== null) {
-      const avgArm = leftArm !== null && rightArm !== null
-        ? (leftArm + rightArm) / 2
-        : (leftArm ?? rightArm)!;
-
-      let change: number | null = null;
-      if (weekAgo) {
-        const oldLeftArm = weekAgo.left_arm;
-        const oldRightArm = weekAgo.right_arm;
-        if (oldLeftArm !== null || oldRightArm !== null) {
-          const oldAvg = oldLeftArm !== null && oldRightArm !== null
-            ? (oldLeftArm + oldRightArm) / 2
-            : (oldLeftArm ?? oldRightArm)!;
-          change = avgArm - oldAvg;
+      let changeClass = '';
+      if (change !== null && change !== 0) {
+        if (neutralChange.includes(field.key)) {
+          // Weight: just show direction, no good/bad
+          changeClass = change > 0 ? 'change-up' : 'change-down';
+        } else if (decreaseIsGood.includes(field.key)) {
+          // Waist/Hips: down is good
+          changeClass = change > 0 ? 'change-up-bad' : 'change-down-good';
+        } else {
+          // Muscle measurements: up is good
+          changeClass = change > 0 ? 'change-up-good' : 'change-down-bad';
         }
+      } else if (change === 0) {
+        changeClass = 'change-neutral';
       }
 
       metrics.push({
-        label: 'Arms',
-        value: avgArm.toFixed(1),
-        unit: 'cm',
+        label: field.label,
+        value: value.toFixed(1),
+        unit: field.unit,
         change,
-        changeText: change !== null ? `${Math.abs(change).toFixed(1)} cm` : '',
+        changeText: change !== null ? `${Math.abs(change).toFixed(1)} ${field.unit}` : '',
         changeDirection: change !== null ? (change > 0 ? '↑' : change < 0 ? '↓' : '→') : '',
-        changeClass: change !== null ? (change > 0 ? 'change-up-good' : change < 0 ? 'change-down-bad' : 'change-neutral') : ''
+        changeClass
       });
     }
 
@@ -211,11 +178,9 @@ export class MeasurementsScreen extends BaseScreen {
       return;
     }
 
-    // Priority fields for charts: weight, waist, chest
-    const priorityKeys = ['weight', 'waist', 'chest'];
+    // Show charts for all fields that have data
     const chartsToRender = MEASUREMENT_FIELDS
-      .filter(f => priorityKeys.includes(f.key) && measurements.some(m => m[f.key] !== null))
-      .slice(0, 3);
+      .filter(f => measurements.some(m => m[f.key] !== null));
 
     if (chartsToRender.length === 0) {
       this.$measurementsCharts.innerHTML = '';
