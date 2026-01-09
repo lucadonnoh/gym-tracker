@@ -615,7 +615,7 @@ class GymTrackerApp {
     newRow.innerHTML = `
       <span class="set-label">Set ${newSetNum}</span>
       <span class="set-reps">extra</span>
-      <input type="number" class="weight-input" value="${defaultWeight}" step="0.5" inputmode="decimal" placeholder="kg"
+      <input type="text" class="weight-input" value="${defaultWeight}" inputmode="decimal" placeholder="kg"
         onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, this.value, 10)">
       <span class="weight-unit">kg</span>
     `;

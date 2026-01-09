@@ -189,9 +189,8 @@ export function renderSetRow(
         placeholder="${repsPlaceholder}"
         onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .weight-input').value, this.value)">
       <span class="reps-unit">reps</span>
-      <input type="number" class="weight-input ${isLogged ? 'filled' : ''}"
+      <input type="text" class="weight-input ${isLogged ? 'filled' : ''}"
         value="${showValue}"
-        step="0.5"
         inputmode="decimal"
         placeholder="${placeholderWeight}"
         onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, this.value, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .reps-input').value)">
@@ -230,10 +229,9 @@ function renderDropsetRow(exercise: ExerciseWithSets, expected: ParsedSet, lastS
       <span class="set-reps">${expected.reps}</span>
       <div class="dropset-weights">
         ${dropsetData.map((d, i) => `
-          <input type="number" class="weight-input dropset-weight ${d.logged ? 'filled' : ''}"
+          <input type="text" class="weight-input dropset-weight ${d.logged ? 'filled' : ''}"
             data-dropset-index="${i}"
             value="${d.logged ? d.weight : ''}"
-            step="0.5"
             inputmode="decimal"
             placeholder="${d.placeholder}"
             onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber + i * 0.1}, this.value, ${d.reps}, true)">
@@ -249,9 +247,8 @@ export function renderExtraSetRow(exercise: ExerciseWithSets, logged: SetLog): s
     <div class="set-row logged" data-exercise="${exercise.id}" data-set="${logged.set_number}">
       <span class="set-label">Set ${logged.set_number}</span>
       <span class="set-reps">extra</span>
-      <input type="number" class="weight-input"
+      <input type="text" class="weight-input"
         value="${logged.weight ?? ''}"
-        step="0.5"
         inputmode="decimal"
         placeholder="kg"
         onchange="app.logSetWeight(${exercise.id}, ${logged.set_number}, this.value, ${logged.reps || 10})">
