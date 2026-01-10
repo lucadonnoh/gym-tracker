@@ -504,8 +504,10 @@ class GymTrackerApp {
     return `
       <div class="exercise-card ${hasLoggedSets ? 'completed' : ''}" id="exercise-${exercise.id}">
         <div class="exercise-header">
-          <span class="exercise-name">${exercise.name}</span>
-          <button class="exercise-info-btn" onclick="event.stopPropagation(); app.showExerciseHistory(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')">ⓘ</button>
+          <div class="exercise-title-row">
+            <span class="exercise-name">${exercise.name}</span>
+            <button class="exercise-info-btn" onclick="event.stopPropagation(); app.showExerciseHistory(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')">ⓘ</button>
+          </div>
           ${volumeHtml}
         </div>
         ${exercise.description ? `<div class="exercise-description">${exercise.description}</div>` : ''}
@@ -577,6 +579,30 @@ class GymTrackerApp {
     }
   }
 
+  async confirmDropset(exerciseId: number, setNumber: number, setId: string, dropCount: number): Promise<void> {
+    if (!this.currentSession) return;
+
+    try {
+      // Log all drops in the dropset
+      for (let i = 0; i < dropCount; i++) {
+        const repsInput = document.getElementById(`${setId}-reps-${i}`) as HTMLInputElement;
+        const weightInput = document.getElementById(`${setId}-weight-${i}`) as HTMLInputElement;
+
+        const reps = parseInt(repsInput?.value) || parseInt(repsInput?.placeholder) || 10;
+        const weight = parseFloat(weightInput?.value.replace(',', '.')) || parseFloat(weightInput?.placeholder) || 0;
+
+        if (weight > 0) {
+          await api.logSet(this.currentSession.id, exerciseId, setNumber + i * 0.1, weight, reps, true);
+        }
+      }
+
+      await api.markExerciseComplete(this.currentSession.id, exerciseId);
+      await this.loadSessionExercises();
+    } catch (err) {
+      console.error('Failed to save dropset', err);
+    }
+  }
+
   async logSetWeight(exerciseId: number, setNumber: number, weight: string, reps: string | number | null, isDropset: boolean = false): Promise<void> {
     if (!this.currentSession) return;
 
@@ -640,10 +666,6 @@ class GymTrackerApp {
       <span class="weight-unit">kg</span>
     `;
     setsList.appendChild(newRow);
-
-    const input = newRow.querySelector('.reps-input') as HTMLInputElement;
-    input?.focus();
-    input?.select();
   }
 
   // ===================

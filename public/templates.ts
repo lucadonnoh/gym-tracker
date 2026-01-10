@@ -253,10 +253,11 @@ function renderDropsetRow(exercise: ExerciseWithSets, expected: ParsedSet, lastS
               placeholder="${d.placeholderWeight}"
               onfocus="this.select()"
               onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber + i * 0.1}, this.value, document.getElementById('${setId}-reps-${i}').value || ${d.defaultReps}, true)">
+            <span class="dropset-unit">kg</span>
           </div>
         `).join('')}
       </div>
-      <span class="weight-unit">kg</span>
+      ${!allDropsetLogged ? `<button class="confirm-btn" onclick="app.confirmDropset(${exercise.id}, ${expected.setNumber}, '${setId}', ${expected.dropsetParts})">✓</button>` : ''}
     </div>
   `;
 }

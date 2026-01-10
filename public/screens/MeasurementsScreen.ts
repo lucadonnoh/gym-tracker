@@ -35,11 +35,8 @@ export class MeasurementsScreen extends BaseScreen {
     // Sort by date descending
     measurements.sort((a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime());
 
-    const latest = measurements[0];
-    const weekAgo = this.findMeasurementFromDaysAgo(measurements, 7);
-
-    // Render summary with changes
-    this.renderSummary(latest, weekAgo);
+    // Render summary with latest value for each field
+    this.renderSummary(measurements);
 
     // Render charts
     try {
@@ -66,10 +63,10 @@ export class MeasurementsScreen extends BaseScreen {
     return measurements[measurements.length - 1] || null; // Return oldest if none found
   }
 
-  private renderSummary(latest: BodyMeasurement | undefined, weekAgo: BodyMeasurement | null): void {
+  private renderSummary(measurements: BodyMeasurement[]): void {
     if (!this.$measurementsSummary) return;
 
-    if (!latest) {
+    if (measurements.length === 0) {
       this.$measurementsSummary.innerHTML = `
         <div class="measurements-empty-state">
           <p>No measurements recorded yet</p>
@@ -79,8 +76,9 @@ export class MeasurementsScreen extends BaseScreen {
       return;
     }
 
-    // Key metrics to show: weight, chest, waist, arms (average)
-    const keyMetrics = this.getKeyMetrics(latest, weekAgo);
+    // Get latest value for each field across all measurements
+    const keyMetrics = this.getKeyMetrics(measurements);
+    const latestDate = new Date(measurements[0].measured_at).toLocaleDateString();
 
     this.$measurementsSummary.innerHTML = `
       <div class="measurements-summary-grid">
@@ -100,11 +98,11 @@ export class MeasurementsScreen extends BaseScreen {
           </div>
         `).join('')}
       </div>
-      <div class="last-measured">Last measured: ${new Date(latest.measured_at).toLocaleDateString()}</div>
+      <div class="last-measured">Last measured: ${latestDate}</div>
     `;
   }
 
-  private getKeyMetrics(latest: BodyMeasurement, weekAgo: BodyMeasurement | null): Array<{
+  private getKeyMetrics(measurements: BodyMeasurement[]): Array<{
     label: string;
     value: string;
     unit: string;
@@ -128,12 +126,27 @@ export class MeasurementsScreen extends BaseScreen {
     // Fields where change is neutral (depends on goals)
     const neutralChange = ['weight'];
 
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() - 7);
+
     // Iterate over all measurement fields
     for (const field of MEASUREMENT_FIELDS) {
-      const value = latest[field.key] as number | null;
-      if (value === null) continue;
+      // Find the latest measurement that has this field
+      const latestWithField = measurements.find(m => m[field.key] !== null);
+      if (!latestWithField) continue;
 
-      const oldValue = weekAgo?.[field.key] as number | null | undefined;
+      const value = latestWithField[field.key] as number;
+
+      // Find a measurement from ~7 days ago that has this field
+      let oldValue: number | null = null;
+      for (const m of measurements) {
+        const mDate = new Date(m.measured_at);
+        if (mDate <= targetDate && m[field.key] !== null) {
+          oldValue = m[field.key] as number;
+          break;
+        }
+      }
+
       const change = oldValue != null ? value - oldValue : null;
 
       let changeClass = '';
