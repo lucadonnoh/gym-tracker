@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Screen Loading', () => {
   let pageErrors: string[] = [];
-  const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3002';
 
   test.beforeEach(async ({ page }) => {
     pageErrors = [];

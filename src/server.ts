@@ -29,6 +29,7 @@ import {
   logSet,
   markExerciseComplete,
   getExerciseProgress,
+  getExerciseHistory,
   getAllExercises,
   deleteSession,
   updateSetLog,
@@ -325,6 +326,12 @@ app.delete('/api/sets/:id', authMiddleware, (req: AuthRequest, res: Response) =>
 // Progress
 app.get('/api/progress/:exerciseId', authMiddleware, (req: AuthRequest, res: Response) => {
   res.json(getExerciseProgress(Number(req.params.exerciseId), req.user!.id));
+});
+
+// Exercise history (last N sessions for a specific exercise)
+app.get('/api/exercises/:exerciseId/history', authMiddleware, (req: AuthRequest, res: Response) => {
+  const limit = req.query.limit ? Number(req.query.limit) : 5;
+  res.json(getExerciseHistory(Number(req.params.exerciseId), req.user!.id, limit));
 });
 
 // Get last session volume for comparison

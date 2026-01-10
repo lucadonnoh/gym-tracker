@@ -315,6 +315,17 @@
       <div class="modal-content" id="weekly-goal-content"></div>
     </div>
 
+    <!-- Exercise History Modal -->
+    <div id="exercise-history-modal" class="modal hidden" onclick="if(event.target === this) app.closeExerciseHistory()">
+      <div class="modal-content exercise-history-content">
+        <div class="exercise-history-header">
+          <h2 id="exercise-history-title">Exercise History</h2>
+          <button class="close-btn" onclick="app.closeExerciseHistory()">&times;</button>
+        </div>
+        <div id="exercise-history-list"></div>
+      </div>
+    </div>
+
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal hidden">
       <div class="modal-content settings-modal-content">

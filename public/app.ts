@@ -99,6 +99,9 @@ class GymTrackerApp {
   private get $measurementModal() { return document.getElementById('measurement-modal'); }
   private get $measurementFormFields() { return document.getElementById('measurement-form-fields'); }
   private get $settingsModal() { return document.getElementById('settings-modal'); }
+  private get $exerciseHistoryModal() { return document.getElementById('exercise-history-modal'); }
+  private get $exerciseHistoryTitle() { return document.getElementById('exercise-history-title'); }
+  private get $exerciseHistoryList() { return document.getElementById('exercise-history-list'); }
   private get $loginScreen() { return document.getElementById('login-screen'); }
 
   constructor() {
@@ -344,13 +347,22 @@ class GymTrackerApp {
   private startTimer(): void {
     this.updateTimer();
     this.timerInterval = window.setInterval(() => this.updateTimer(), 1000);
+    // Sync timer when page becomes visible again (fixes frozen timer on background)
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
   }
+
+  private handleVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') {
+      this.updateTimer(); // Immediate sync when returning to app
+    }
+  };
 
   private stopTimer(): void {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
   }
 
   private updateTimer(): void {
@@ -493,6 +505,7 @@ class GymTrackerApp {
       <div class="exercise-card ${hasLoggedSets ? 'completed' : ''}" id="exercise-${exercise.id}">
         <div class="exercise-header">
           <span class="exercise-name">${exercise.name}</span>
+          <button class="exercise-info-btn" onclick="event.stopPropagation(); app.showExerciseHistory(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')">ⓘ</button>
           ${volumeHtml}
         </div>
         ${exercise.description ? `<div class="exercise-description">${exercise.description}</div>` : ''}
@@ -523,8 +536,11 @@ class GymTrackerApp {
             sets.push({ setNumber: setNumber++, reps: 'max', isDropset: false });
           }
         } else if (repsStr.includes('-')) {
+          // Dropset: "3x10-10-10" means 3 dropsets, each with 3 drops
           const dropsetParts = repsStr.split('-').length;
-          sets.push({ setNumber: setNumber++, reps: repsStr, isDropset: true, dropsetParts });
+          for (let i = 0; i < count; i++) {
+            sets.push({ setNumber: setNumber++, reps: repsStr, isDropset: true, dropsetParts });
+          }
         } else {
           const reps = parseInt(repsStr);
           for (let i = 0; i < count; i++) {
@@ -614,14 +630,18 @@ class GymTrackerApp {
     newRow.dataset.set = newSetNum.toString();
     newRow.innerHTML = `
       <span class="set-label">Set ${newSetNum}</span>
-      <span class="set-reps">extra</span>
+      <input type="number" class="reps-input" value="10" inputmode="numeric" placeholder="reps"
+        onfocus="this.select()"
+        onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, document.querySelector('[data-exercise=\\'${exerciseId}\\'][data-set=\\'${newSetNum}\\'] .weight-input').value, this.value)">
+      <span class="reps-unit">reps</span>
       <input type="text" class="weight-input" value="${defaultWeight}" inputmode="decimal" placeholder="kg"
-        onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, this.value, 10)">
+        onfocus="this.select()"
+        onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, this.value, document.querySelector('[data-exercise=\\'${exerciseId}\\'][data-set=\\'${newSetNum}\\'] .reps-input').value)">
       <span class="weight-unit">kg</span>
     `;
     setsList.appendChild(newRow);
 
-    const input = newRow.querySelector('.weight-input') as HTMLInputElement;
+    const input = newRow.querySelector('.reps-input') as HTMLInputElement;
     input?.focus();
     input?.select();
   }
@@ -1857,6 +1877,49 @@ class GymTrackerApp {
       if (group.note) part += ` (${group.note})`;
       return part;
     }).join(', ');
+  }
+
+  // Exercise History Modal
+  async showExerciseHistory(exerciseId: number, exerciseName: string): Promise<void> {
+    if (!this.$exerciseHistoryModal || !this.$exerciseHistoryTitle || !this.$exerciseHistoryList) return;
+
+    this.$exerciseHistoryTitle.textContent = exerciseName;
+    this.$exerciseHistoryList.innerHTML = '<div class="loading">Loading history...</div>';
+    this.$exerciseHistoryModal.classList.remove('hidden');
+
+    try {
+      const history = await api.getExerciseHistory(exerciseId, 5);
+
+      if (history.length === 0) {
+        this.$exerciseHistoryList.innerHTML = '<div class="exercise-history-empty">No previous sessions found</div>';
+        return;
+      }
+
+      this.$exerciseHistoryList.innerHTML = history.map(session => {
+        const date = new Date(session.date);
+        const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        const setsHtml = session.sets.map(set =>
+          `<span class="exercise-history-set">${set.weight}kg × ${set.reps}</span>`
+        ).join('');
+
+        return `
+          <div class="exercise-history-session">
+            <div class="exercise-history-date">${dateStr}</div>
+            <div class="exercise-history-sets">${setsHtml}</div>
+            <div class="exercise-history-volume">Vol: ${session.volume.toLocaleString()}kg</div>
+          </div>
+        `;
+      }).join('');
+    } catch (error) {
+      console.error('Failed to load exercise history:', error);
+      this.$exerciseHistoryList.innerHTML = '<div class="exercise-history-empty">Failed to load history</div>';
+    }
+  }
+
+  closeExerciseHistory(): void {
+    if (this.$exerciseHistoryModal) {
+      this.$exerciseHistoryModal.classList.add('hidden');
+    }
   }
 }
 

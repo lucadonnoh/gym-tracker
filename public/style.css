@@ -502,6 +502,39 @@ h2 {
   width: 54px;
 }
 
+/* New dropset layout with reps */
+.dropset-row {
+  flex-wrap: wrap;
+}
+
+.dropset-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  flex: 1;
+}
+
+.dropset-drop {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dropset-reps {
+  width: 36px;
+  text-align: center;
+  padding: 0.375rem 0.25rem;
+}
+
+.dropset-x {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.dropset-drop .dropset-weight {
+  width: 48px;
+}
+
 .add-set-btn {
   width: 100%;
   padding: 0.625rem;
@@ -593,6 +626,14 @@ h2 {
 .history-day {
   color: var(--text-secondary);
   font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.history-day .pr-badge {
+  background: var(--gold);
+  color: var(--black);
 }
 
 .history-duration {
@@ -2287,5 +2328,90 @@ canvas {
 }
 
 .settings-actions button:last-child:active {
+  background: var(--surface);
+}
+
+/* Exercise History Modal */
+.exercise-history-content {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.exercise-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.exercise-history-header h2 {
+  margin: 0;
+}
+
+.exercise-history-header .close-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: var(--space-xs);
+  line-height: 1;
+}
+
+.exercise-history-session {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.exercise-history-date {
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  color: var(--text-primary);
+}
+
+.exercise-history-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.exercise-history-set {
+  background: var(--black);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.exercise-history-volume {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.exercise-history-empty {
+  text-align: center;
+  padding: var(--space-xl);
+  color: var(--text-secondary);
+}
+
+/* Exercise Info Button */
+.exercise-info-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  margin-left: var(--space-xs);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.exercise-info-btn:active {
+  color: var(--text-primary);
   background: var(--surface);
 }

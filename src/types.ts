@@ -19,6 +19,7 @@ export interface Session {
   started_at: string;
   ended_at: string | null;
   notes: string | null;
+  pr_count: number;
 }
 
 export interface SessionExercise {

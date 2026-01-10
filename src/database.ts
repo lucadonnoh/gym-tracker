@@ -30,6 +30,9 @@ export function initializeDatabase(): void {
   // Always check if settings table needs migration (may have been missed in previous partial migration)
   migrateSettingsTable();
 
+  // Add pr_count column if missing (for existing databases)
+  migrateSessionsPrCount();
+
   // Now create tables - will skip if they exist (after migration added user_id)
   db.exec(`
     CREATE TABLE IF NOT EXISTS workout_days (
@@ -54,7 +57,8 @@ export function initializeDatabase(): void {
       day_id INTEGER NOT NULL REFERENCES workout_days(id),
       started_at TEXT NOT NULL,
       ended_at TEXT,
-      notes TEXT
+      notes TEXT,
+      pr_count INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS session_exercises (
@@ -174,6 +178,50 @@ function migrateSettingsTable(): void {
     } catch (e) {
       console.error('Failed to migrate settings table:', e);
     }
+  }
+}
+
+// Add pr_count column to sessions table if it doesn't exist, and backfill existing sessions
+function migrateSessionsPrCount(): void {
+  const sessionsInfo = db.prepare("PRAGMA table_info(sessions)").all() as { name: string }[];
+  if (sessionsInfo.length > 0 && !sessionsInfo.some(col => col.name === 'pr_count')) {
+    console.log('Adding pr_count column to sessions table...');
+    try {
+      db.exec('ALTER TABLE sessions ADD COLUMN pr_count INTEGER DEFAULT 0');
+      // Backfill will happen below
+    } catch (e) {
+      console.error('Failed to add pr_count column:', e);
+      return;
+    }
+  }
+
+  // Backfill pr_count for completed sessions that have never had pr_count calculated
+  // Only processes sessions with NULL pr_count (not 0, which is a valid calculated value)
+  const sessionsToBackfill = db.prepare(`
+    SELECT id, user_id FROM sessions
+    WHERE ended_at IS NOT NULL AND pr_count IS NULL
+  `).all() as { id: number; user_id: number }[];
+
+  if (sessionsToBackfill.length > 0) {
+    console.log(`Backfilling pr_count for ${sessionsToBackfill.length} sessions...`);
+    const updateStmt = db.prepare('UPDATE sessions SET pr_count = ? WHERE id = ?');
+
+    for (const session of sessionsToBackfill) {
+      try {
+        const stats = getSessionStats(session.id, session.user_id);
+        const prCount = stats.reduce((count, ex) => {
+          return count +
+            (ex.prs.volume ? 1 : 0) +
+            (ex.prs.setVolume ? 1 : 0) +
+            (ex.prs.weight ? 1 : 0) +
+            (ex.prs.reps ? 1 : 0);
+        }, 0);
+        updateStmt.run(prCount, session.id);
+      } catch (e) {
+        console.error(`Failed to backfill pr_count for session ${session.id}:`, e);
+      }
+    }
+    console.log('Backfill complete.');
   }
 }
 
@@ -336,18 +384,34 @@ export function endSession(id: number, userId: number, notes?: string): Session 
   const session = getSessionById(id, userId);
   if (!session) return undefined;
 
-  db.prepare('UPDATE sessions SET ended_at = ?, notes = ? WHERE id = ?').run(new Date().toISOString(), notes || null, id);
+  // Calculate PR count before ending the session
+  const stats = getSessionStats(id, userId);
+  const prCount = stats.reduce((count, ex) => {
+    return count +
+      (ex.prs.volume ? 1 : 0) +
+      (ex.prs.setVolume ? 1 : 0) +
+      (ex.prs.weight ? 1 : 0) +
+      (ex.prs.reps ? 1 : 0);
+  }, 0);
+
+  db.prepare('UPDATE sessions SET ended_at = ?, notes = ?, pr_count = ? WHERE id = ?').run(
+    new Date().toISOString(),
+    notes || null,
+    prCount,
+    id
+  );
   return getSessionById(id, userId);
 }
 
-export function getAllSessions(userId: number): SessionWithDay[] {
+export function getAllSessions(userId: number): (SessionWithDay & { pr_count: number })[] {
+  // pr_count is now stored in the sessions table when session ends
   return db.prepare(`
     SELECT s.*, d.name as day_name, d.display_name as day_display_name
     FROM sessions s
     JOIN workout_days d ON s.day_id = d.id
     WHERE s.user_id = ?
     ORDER BY s.started_at DESC
-  `).all(userId) as SessionWithDay[];
+  `).all(userId) as (SessionWithDay & { pr_count: number })[];
 }
 
 export function getActiveSession(userId: number): SessionWithDay | undefined {
@@ -512,6 +576,47 @@ export function getAllExercises(userId: number): (Exercise & { day_display_name:
     WHERE d.user_id = ?
     ORDER BY d.id, e.order_index
   `).all(userId) as (Exercise & { day_display_name: string })[];
+}
+
+// Get recent session history for a specific exercise
+export function getExerciseHistory(exerciseId: number, userId: number, limit: number = 5): {
+  session_id: number;
+  date: string;
+  sets: { set_number: number; weight: number; reps: number }[];
+  volume: number;
+}[] {
+  const exercise = getExerciseById(exerciseId, userId);
+  if (!exercise) return [];
+
+  // Get recent sessions that have this exercise
+  const sessions = db.prepare(`
+    SELECT DISTINCT s.id, s.started_at
+    FROM sessions s
+    JOIN session_exercises se ON se.session_id = s.id
+    JOIN set_logs sl ON sl.session_exercise_id = se.id
+    WHERE se.exercise_id = ? AND s.user_id = ? AND s.ended_at IS NOT NULL
+    ORDER BY s.started_at DESC
+    LIMIT ?
+  `).all(exerciseId, userId, limit) as { id: number; started_at: string }[];
+
+  return sessions.map(session => {
+    const sets = db.prepare(`
+      SELECT sl.set_number, sl.weight, sl.reps
+      FROM set_logs sl
+      JOIN session_exercises se ON sl.session_exercise_id = se.id
+      WHERE se.session_id = ? AND se.exercise_id = ?
+      ORDER BY sl.set_number
+    `).all(session.id, exerciseId) as { set_number: number; weight: number; reps: number }[];
+
+    const volume = sets.reduce((sum, s) => sum + (s.weight || 0) * (s.reps || 0), 0);
+
+    return {
+      session_id: session.id,
+      date: session.started_at,
+      sets,
+      volume
+    };
+  });
 }
 
 // Get last session volume for an exercise (excluding current session)

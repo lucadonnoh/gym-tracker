@@ -43,6 +43,7 @@ export interface Session {
   notes: string | null;
   day_name?: string;
   day_display_name?: string;
+  pr_count?: number;
 }
 
 export interface ProgressData {

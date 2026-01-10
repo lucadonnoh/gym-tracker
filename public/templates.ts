@@ -38,11 +38,14 @@ export function renderHistoryItem(session: Session): string {
   const started = new Date(session.started_at);
   const ended = session.ended_at ? new Date(session.ended_at) : null;
   const duration = ended ? formatDuration(ended.getTime() - started.getTime()) : 'In progress';
+  const prBadge = session.pr_count && session.pr_count > 0
+    ? `<span class="pr-badge">${session.pr_count} PR${session.pr_count > 1 ? 's' : ''}</span>`
+    : '';
 
   return `
     <div class="history-item" onclick="app.showSessionDetail(${session.id})">
       <div class="history-date">${started.toLocaleDateString()}</div>
-      <div class="history-day">${session.day_display_name}</div>
+      <div class="history-day">${session.day_display_name}${prBadge}</div>
       <div class="history-duration">${duration}</div>
     </div>
   `;
@@ -187,12 +190,14 @@ export function renderSetRow(
         value="${showReps}"
         inputmode="numeric"
         placeholder="${repsPlaceholder}"
+        onfocus="this.select()"
         onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .weight-input').value, this.value)">
       <span class="reps-unit">reps</span>
       <input type="text" class="weight-input ${isLogged ? 'filled' : ''}"
         value="${showValue}"
         inputmode="decimal"
         placeholder="${placeholderWeight}"
+        onfocus="this.select()"
         onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, this.value, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .reps-input').value)">
       <span class="weight-unit">kg</span>
       ${!isLogged ? `<button class="confirm-btn" onclick="app.confirmSet(${exercise.id}, ${expected.setNumber}, ${confirmWeight}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .reps-input').value || ${confirmReps})">✓</button>` : ''}
@@ -202,7 +207,7 @@ export function renderSetRow(
 
 function renderDropsetRow(exercise: ExerciseWithSets, expected: ParsedSet, lastSets: SetLog[]): string {
   const loggedSets = exercise.sets || [];
-  const dropsetData: { weight: number | string; logged: boolean; placeholder: string; reps: number }[] = [];
+  const dropsetData: { weight: number | string; reps: number | string; logged: boolean; placeholderWeight: string; placeholderReps: number; defaultReps: number }[] = [];
 
   // Parse reps from the expected.reps string (e.g., "10-10-10" -> [10, 10, 10])
   const repsArray = typeof expected.reps === 'string'
@@ -213,28 +218,42 @@ function renderDropsetRow(exercise: ExerciseWithSets, expected: ParsedSet, lastS
     const subSetNum = expected.setNumber + i * 0.1;
     const subLogged = loggedSets.find(s => Math.abs(s.set_number - subSetNum) < 0.01);
     const lastSet = lastSets.find(s => Math.abs(s.set_number - subSetNum) < 0.01);
+    const defaultReps = repsArray[i] ?? repsArray[0] ?? 10;
     dropsetData.push({
       weight: subLogged?.weight ?? '',
+      reps: subLogged?.reps ?? '',
       logged: subLogged?.weight !== null && subLogged?.weight !== undefined,
-      placeholder: lastSet?.weight?.toString() || 'kg',
-      reps: repsArray[i] ?? repsArray[0] ?? 10
+      placeholderWeight: lastSet?.weight?.toString() || 'kg',
+      placeholderReps: lastSet?.reps || defaultReps,
+      defaultReps
     });
   }
 
   const allDropsetLogged = dropsetData.every(d => d.logged);
+  const setId = `dropset-${exercise.id}-${expected.setNumber}`;
 
   return `
-    <div class="set-row ${allDropsetLogged ? 'logged' : ''}" data-exercise="${exercise.id}" data-set="${expected.setNumber}">
+    <div class="set-row dropset-row ${allDropsetLogged ? 'logged' : ''}" data-exercise="${exercise.id}" data-set="${expected.setNumber}">
       <span class="set-label">Set ${expected.setNumber}</span>
-      <span class="set-reps">${expected.reps}</span>
-      <div class="dropset-weights">
+      <div class="dropset-inputs">
         ${dropsetData.map((d, i) => `
-          <input type="text" class="weight-input dropset-weight ${d.logged ? 'filled' : ''}"
-            data-dropset-index="${i}"
-            value="${d.logged ? d.weight : ''}"
-            inputmode="decimal"
-            placeholder="${d.placeholder}"
-            onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber + i * 0.1}, this.value, ${d.reps}, true)">
+          <div class="dropset-drop" data-drop="${i}">
+            <input type="number" class="reps-input dropset-reps ${d.logged ? 'filled' : ''}"
+              id="${setId}-reps-${i}"
+              value="${d.logged ? d.reps : ''}"
+              inputmode="numeric"
+              placeholder="${d.placeholderReps}"
+              onfocus="this.select()"
+              onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber + i * 0.1}, document.getElementById('${setId}-weight-${i}').value, this.value, true)">
+            <span class="dropset-x">×</span>
+            <input type="text" class="weight-input dropset-weight ${d.logged ? 'filled' : ''}"
+              id="${setId}-weight-${i}"
+              value="${d.logged ? d.weight : ''}"
+              inputmode="decimal"
+              placeholder="${d.placeholderWeight}"
+              onfocus="this.select()"
+              onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber + i * 0.1}, this.value, document.getElementById('${setId}-reps-${i}').value || ${d.defaultReps}, true)">
+          </div>
         `).join('')}
       </div>
       <span class="weight-unit">kg</span>
@@ -246,12 +265,19 @@ export function renderExtraSetRow(exercise: ExerciseWithSets, logged: SetLog): s
   return `
     <div class="set-row logged" data-exercise="${exercise.id}" data-set="${logged.set_number}">
       <span class="set-label">Set ${logged.set_number}</span>
-      <span class="set-reps">extra</span>
+      <input type="number" class="reps-input"
+        value="${logged.reps || 10}"
+        inputmode="numeric"
+        placeholder="reps"
+        onfocus="this.select()"
+        onchange="app.logSetWeight(${exercise.id}, ${logged.set_number}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${logged.set_number}\\'] .weight-input').value, this.value)">
+      <span class="reps-unit">reps</span>
       <input type="text" class="weight-input"
         value="${logged.weight ?? ''}"
         inputmode="decimal"
         placeholder="kg"
-        onchange="app.logSetWeight(${exercise.id}, ${logged.set_number}, this.value, ${logged.reps || 10})">
+        onfocus="this.select()"
+        onchange="app.logSetWeight(${exercise.id}, ${logged.set_number}, this.value, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${logged.set_number}\\'] .reps-input').value)">
       <span class="weight-unit">kg</span>
     </div>
   `;
