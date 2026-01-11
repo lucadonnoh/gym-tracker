@@ -49,20 +49,6 @@ export class MeasurementsScreen extends BaseScreen {
     this.renderHistory(measurements);
   }
 
-  private findMeasurementFromDaysAgo(measurements: BodyMeasurement[], days: number): BodyMeasurement | null {
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() - days);
-
-    // Find the measurement closest to target date (but before it)
-    for (const m of measurements) {
-      const mDate = new Date(m.measured_at);
-      if (mDate <= targetDate) {
-        return m;
-      }
-    }
-    return measurements[measurements.length - 1] || null; // Return oldest if none found
-  }
-
   private renderSummary(measurements: BodyMeasurement[]): void {
     if (!this.$measurementsSummary) return;
 
@@ -90,10 +76,10 @@ export class MeasurementsScreen extends BaseScreen {
               <div class="metric-change">
                 <span class="change-arrow">${m.changeDirection}</span>
                 <span class="change-value">${m.changeText}</span>
-                <span class="change-period">vs 7d ago</span>
+                <span class="change-period">this month</span>
               </div>
             ` : `
-              <div class="metric-change no-data">No prior data</div>
+              <div class="metric-change no-data">No prior data this month</div>
             `}
           </div>
         `).join('')}
@@ -126,8 +112,9 @@ export class MeasurementsScreen extends BaseScreen {
     // Fields where change is neutral (depends on goals)
     const neutralChange = ['weight'];
 
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() - 7);
+    // Get first day of current month for comparison
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Iterate over all measurement fields
     for (const field of MEASUREMENT_FIELDS) {
@@ -137,14 +124,17 @@ export class MeasurementsScreen extends BaseScreen {
 
       const value = latestWithField[field.key] as number;
 
-      // Find a measurement from ~7 days ago that has this field
+      // Find the first measurement of the current month that has this field
+      // (oldest measurement in current month, i.e., closest to start of month)
       let oldValue: number | null = null;
-      for (const m of measurements) {
+      const currentMonthMeasurements = measurements.filter(m => {
         const mDate = new Date(m.measured_at);
-        if (mDate <= targetDate && m[field.key] !== null) {
-          oldValue = m[field.key] as number;
-          break;
-        }
+        return mDate >= startOfMonth && m[field.key] !== null;
+      });
+      if (currentMonthMeasurements.length > 1) {
+        // Get the oldest one (last in the filtered array since sorted desc)
+        const firstOfMonth = currentMonthMeasurements[currentMonthMeasurements.length - 1];
+        oldValue = firstOfMonth[field.key] as number;
       }
 
       const change = oldValue != null ? value - oldValue : null;
