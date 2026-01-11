@@ -88,7 +88,7 @@ export function renderSessionSummary(totalVolume: number, exerciseCount: number,
 
 // Set badge for history (click to edit)
 export function renderSetBadge(setId: number, weight: number, reps: number, exerciseId: number): string {
-  return `<span id="set-${setId}" class="inline-block px-2 py-1 bg-black border border-border rounded text-sm cursor-pointer" onclick="app.editSetInline(${setId}, ${exerciseId}, null, ${weight}, ${reps})">${weight}kg x ${reps}</span>`;
+  return `<span id="set-${setId}" class="inline-block px-2 py-1 bg-black border border-border rounded text-sm cursor-pointer" onclick="app.editSetInline(${setId}, ${exerciseId}, null, ${weight}, ${reps})">${reps} x ${weight}kg</span>`;
 }
 
 // Inline editor for history (same visual as session row)

@@ -485,7 +485,7 @@ class GymTrackerApp {
         <div class="mb-3">
           <div class="flex items-center gap-2">
             <span class="font-semibold text-text-primary">${exercise.name}</span>
-            <button class="w-6 h-6 text-text-muted text-sm hover:text-text-primary" onclick="event.stopPropagation(); app.showExerciseHistory(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')">ⓘ</button>
+            <button class="w-6 h-6 text-text-muted hover:text-text-primary flex items-center justify-center" onclick="event.stopPropagation(); app.showExerciseHistory(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>
           </div>
           ${volumeHtml}
         </div>
@@ -1781,14 +1781,14 @@ class GymTrackerApp {
     if (!this.$exerciseHistoryModal || !this.$exerciseHistoryTitle || !this.$exerciseHistoryList) return;
 
     this.$exerciseHistoryTitle.textContent = exerciseName;
-    this.$exerciseHistoryList.innerHTML = '<div class="loading">Loading history...</div>';
+    this.$exerciseHistoryList.innerHTML = '<div class="text-center text-text-muted py-4">Loading history...</div>';
     this.$exerciseHistoryModal.classList.remove('hidden');
 
     try {
       const history = await api.getExerciseHistory(exerciseId, 5);
 
       if (history.length === 0) {
-        this.$exerciseHistoryList.innerHTML = '<div class="exercise-history-empty">No previous sessions found</div>';
+        this.$exerciseHistoryList.innerHTML = '<div class="text-center text-text-muted py-8">No previous sessions found</div>';
         return;
       }
 
@@ -1796,20 +1796,20 @@ class GymTrackerApp {
         const date = new Date(session.date);
         const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
         const setsHtml = session.sets.map(set =>
-          `<span class="exercise-history-set">${set.weight}kg × ${set.reps}</span>`
+          `<span class="inline-block px-2 py-1 bg-black rounded text-sm text-text-primary">${set.reps} × ${set.weight}kg</span>`
         ).join('');
 
         return `
-          <div class="exercise-history-session">
-            <div class="exercise-history-date">${dateStr}</div>
-            <div class="exercise-history-sets">${setsHtml}</div>
-            <div class="exercise-history-volume">Vol: ${session.volume.toLocaleString()}kg</div>
+          <div class="bg-surface border border-border rounded-lg p-3 mb-3">
+            <div class="text-sm font-medium text-text-primary mb-2">${dateStr}</div>
+            <div class="flex flex-wrap gap-2 mb-2">${setsHtml}</div>
+            <div class="text-xs text-text-muted">Volume: ${session.volume.toLocaleString()}kg</div>
           </div>
         `;
       }).join('');
     } catch (error) {
       console.error('Failed to load exercise history:', error);
-      this.$exerciseHistoryList.innerHTML = '<div class="exercise-history-empty">Failed to load history</div>';
+      this.$exerciseHistoryList.innerHTML = '<div class="text-center text-text-muted py-8">Failed to load history</div>';
     }
   }
 
