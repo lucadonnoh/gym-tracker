@@ -513,6 +513,7 @@
   grid-template-columns: repeat(2, 1fr);
   gap: var(--space-sm);
   margin-bottom: var(--space-md);
+  align-items: start;
 }
 
 .metric-card {
