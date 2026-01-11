@@ -304,6 +304,15 @@ class Api {
   async setWeeklyGoal(goal: number): Promise<{ goal: number }> {
     return this.put('/api/stats/weekly-goal', { goal });
   }
+
+  // Admin (donnoh only)
+  async getUsers(): Promise<User[]> {
+    return this.get('/api/admin/users');
+  }
+
+  async createUser(username: string): Promise<{ id: number; username: string }> {
+    return this.post('/api/admin/users', { username });
+  }
 }
 
 export const api = new Api();

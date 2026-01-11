@@ -1,5 +1,6 @@
 import { BaseScreen } from './BaseScreen.js';
 import type { RouteParams, ScreenContext } from './types.js';
+import { api } from '../api.js';
 
 /**
  * Manage screen - allows adding/editing workout days and exercises.
@@ -19,6 +20,14 @@ export class ManageScreen extends BaseScreen {
 
   private get $addExerciseBtn() {
     return document.getElementById('add-exercise-btn');
+  }
+
+  private get $adminSection() {
+    return document.getElementById('admin-section');
+  }
+
+  private get $userList() {
+    return document.getElementById('user-list');
   }
 
   constructor(ctx: ScreenContext) {
@@ -41,6 +50,35 @@ export class ManageScreen extends BaseScreen {
 
     // Hide add button until day is selected
     this.$addExerciseBtn?.classList.add('hidden');
+
+    // Show admin section only for admins
+    if (state.currentUser?.is_admin) {
+      this.$adminSection?.classList.remove('hidden');
+      this.loadUsers();
+    } else {
+      this.$adminSection?.classList.add('hidden');
+    }
+  }
+
+  private async loadUsers(): Promise<void> {
+    if (!this.$userList) return;
+
+    try {
+      const users = await api.getUsers();
+      this.$userList.innerHTML = users.map(u => {
+        const escaped = this.escapeHtml(u.username);
+        const adminBadge = u.is_admin ? ' <span class="text-accent text-xs">(admin)</span>' : '';
+        return `<div class="py-2 border-b border-border last:border-b-0">${escaped}${adminBadge} <span class="text-text-muted text-xs">(created ${new Date(u.created_at).toLocaleDateString()})</span></div>`;
+      }).join('');
+    } catch {
+      this.$userList.innerHTML = '<div class="text-text-muted">Failed to load users</div>';
+    }
+  }
+
+  private escapeHtml(str: string): string {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   // No cleanup needed - inherits empty exit() from BaseScreen

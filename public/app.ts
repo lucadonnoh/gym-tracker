@@ -481,20 +481,20 @@ class GymTrackerApp {
     const volumeHtml = templates.renderVolumeDisplay(currentVolume, exercise.lastVolume);
 
     return `
-      <div class="exercise-card ${hasLoggedSets ? 'completed' : ''}" id="exercise-${exercise.id}">
-        <div class="exercise-header">
-          <div class="exercise-title-row">
-            <span class="exercise-name">${exercise.name}</span>
-            <button class="exercise-info-btn" onclick="event.stopPropagation(); app.showExerciseHistory(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')">ⓘ</button>
+      <div class="bg-surface border ${hasLoggedSets ? 'border-accent-dim' : 'border-border'} rounded-lg p-4 mb-4" id="exercise-${exercise.id}">
+        <div class="mb-3">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-text-primary">${exercise.name}</span>
+            <button class="w-6 h-6 text-text-muted text-sm hover:text-text-primary" onclick="event.stopPropagation(); app.showExerciseHistory(${exercise.id}, '${exercise.name.replace(/'/g, "\\'")}')">ⓘ</button>
           </div>
           ${volumeHtml}
         </div>
-        ${exercise.description ? `<div class="exercise-description">${exercise.description}</div>` : ''}
-        <div class="sets-list">
+        ${exercise.description ? `<div class="text-sm text-text-muted mb-3">${exercise.description}</div>` : ''}
+        <div class="sets-list flex flex-col gap-2">
           ${setRows}
           ${extraRows}
         </div>
-        <button class="add-set-btn" onclick="app.addExtraSet(${exercise.id})">+ Add Set</button>
+        <button class="w-full mt-3 p-2 border border-dashed border-border text-text-muted text-sm rounded-lg" onclick="app.addExtraSet(${exercise.id})">+ Add Set</button>
       </div>
     `;
   }
@@ -630,21 +630,33 @@ class GymTrackerApp {
     const defaultWeight = exercise.default_weight || '';
 
     const newRow = document.createElement('div');
-    newRow.className = 'set-row';
+    newRow.className = 'flex items-center gap-2 p-3 bg-surface border border-dashed border-border rounded-lg';
     newRow.dataset.exercise = exerciseId.toString();
     newRow.dataset.set = newSetNum.toString();
+    newRow.dataset.extra = 'true';
     newRow.innerHTML = `
-      <span class="set-label">Set ${newSetNum}</span>
-      <input type="number" class="reps-input" value="10" inputmode="numeric" placeholder="reps"
+      <button class="w-6 h-6 text-text-muted text-base hover:text-danger" onclick="app.removeExtraSet(${exerciseId}, ${newSetNum})">×</button>
+      <span class="text-sm text-text-muted w-12">Extra</span>
+      <input type="number" class="w-14 p-2 bg-black border border-border rounded text-center text-sm"
+        value="" inputmode="numeric" placeholder="10"
         onfocus="this.select()"
         onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, document.querySelector('[data-exercise=\\'${exerciseId}\\'][data-set=\\'${newSetNum}\\'] .weight-input').value, this.value)">
-      <span class="reps-unit">reps</span>
-      <input type="text" class="weight-input" value="${defaultWeight}" inputmode="decimal" placeholder="kg"
+      <span class="text-xs text-text-muted">reps</span>
+      <input type="text" class="weight-input w-16 p-2 bg-black border border-border rounded text-center text-sm"
+        value="" inputmode="decimal" placeholder="${defaultWeight || 'kg'}"
         onfocus="this.select()"
-        onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, this.value, document.querySelector('[data-exercise=\\'${exerciseId}\\'][data-set=\\'${newSetNum}\\'] .reps-input').value)">
-      <span class="weight-unit">kg</span>
+        onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, this.value, document.querySelector('[data-exercise=\\'${exerciseId}\\'][data-set=\\'${newSetNum}\\'] input[type=number]').value)">
+      <span class="text-xs text-text-muted">kg</span>
+      <button class="ml-auto w-10 h-10 bg-accent text-black font-bold rounded-lg" onclick="app.confirmSet(${exerciseId}, ${newSetNum}, ${defaultWeight || 0}, 10)">✓</button>
     `;
     setsList.appendChild(newRow);
+  }
+
+  removeExtraSet(exerciseId: number, setNum: number): void {
+    const row = document.querySelector(`[data-exercise="${exerciseId}"][data-set="${setNum}"][data-extra="true"]`);
+    if (row) {
+      row.remove();
+    }
   }
 
   // ===================
@@ -1188,7 +1200,7 @@ class GymTrackerApp {
     const exercises = await api.getDayExercises(parseInt(dayId));
 
     if (exercises.length === 0) {
-      this.$progressCharts.innerHTML = '<p class="no-data">No exercises for this day</p>';
+      this.$progressCharts.innerHTML = '<p class="text-center text-text-muted py-8">No exercises for this day</p>';
       return;
     }
 
@@ -1197,11 +1209,11 @@ class GymTrackerApp {
 
     // Create container for each exercise
     this.$progressCharts.innerHTML = exercises.map(ex => `
-      <div class="progress-exercise" id="progress-exercise-${ex.id}">
-        <h3 class="progress-exercise-name">${ex.name}</h3>
-        <div class="progress-exercise-charts">
-          <canvas id="weight-chart-${ex.id}"></canvas>
-          <canvas id="reps-chart-${ex.id}"></canvas>
+      <div class="bg-surface border border-border rounded-lg p-4 mb-4" id="progress-exercise-${ex.id}">
+        <h3 class="font-semibold text-text-primary mb-3">${ex.name}</h3>
+        <div class="progress-charts-container grid gap-4">
+          <div class="h-[150px]"><canvas id="weight-chart-${ex.id}"></canvas></div>
+          <div class="h-[150px]"><canvas id="reps-chart-${ex.id}"></canvas></div>
         </div>
       </div>
     `).join('');
@@ -1213,9 +1225,9 @@ class GymTrackerApp {
         this.renderExerciseCharts(exercise.id, data);
       } else {
         const container = document.getElementById(`progress-exercise-${exercise.id}`);
-        const chartsDiv = container?.querySelector('.progress-exercise-charts');
+        const chartsDiv = container?.querySelector('.progress-charts-container');
         if (chartsDiv) {
-          chartsDiv.innerHTML = '<p class="no-data">No data yet</p>';
+          chartsDiv.innerHTML = '<p class="text-center text-text-muted py-4">No data yet</p>';
         }
       }
     }
@@ -1342,17 +1354,26 @@ class GymTrackerApp {
 
     MEASUREMENT_FIELDS.forEach(f => sections[f.section].push(f));
 
+    const renderInput = (f: MeasurementFieldConfig) => `
+      <div>
+        <label class="block text-sm text-text-secondary mb-1">${f.label} (${f.unit})</label>
+        <input type="text" id="measurement-${f.key}" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*"
+          class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
+      </div>`;
+
     const renderSection = (title: string, fields: MeasurementFieldConfig[]) => {
       if (fields.length === 0) return '';
-      const inputs = fields.map(f => `
-        <label class="measurement-input-group">
-          <span>${f.label} (${f.unit})</span>
-          <input type="text" id="measurement-${f.key}" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
-        </label>
-      `).join('');
-      return title
-        ? `<h3 class="measurement-section-title">${title}</h3><div class="measurement-form-grid">${inputs}</div>`
-        : `<div class="measurement-form-grid">${inputs}</div>`;
+      const inputs = fields.map(renderInput).join('');
+
+      if (!title) {
+        return `<div class="grid grid-cols-2 gap-4">${inputs}</div>`;
+      }
+
+      return `
+        <div class="mt-8 pt-6 border-t border-border">
+          <h3 class="text-base font-bold text-text-primary uppercase tracking-wider mb-4">${title}</h3>
+          <div class="grid grid-cols-2 gap-4">${inputs}</div>
+        </div>`;
     };
 
     this.$measurementFormFields.innerHTML =
@@ -1471,6 +1492,32 @@ class GymTrackerApp {
     }
 
     this.$addExerciseBtn?.classList.remove('hidden');
+  }
+
+  // ===================
+  // Admin (donnoh only)
+  // ===================
+
+  async addUser(): Promise<void> {
+    if (!this.currentUser?.is_admin) return;
+
+    const input = document.getElementById('new-username') as HTMLInputElement;
+    const username = input?.value?.trim();
+
+    if (!username || username.length < 2) {
+      alert('Username must be at least 2 characters');
+      return;
+    }
+
+    try {
+      const result = await api.createUser(username);
+      alert(`User "${result.username}" created.\nDefault password: 1234\n\nThey should change it after first login.`);
+      input.value = '';
+      // Refresh user list
+      await this.screenManager.navigateTo('manage-screen');
+    } catch (error: any) {
+      alert(error.message || 'Failed to create user');
+    }
   }
 
   // ===================

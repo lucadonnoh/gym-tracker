@@ -105,4 +105,82 @@
   body.js-loading #app {
     visibility: hidden;
   }
+
+  /* Set group builder in Add Exercise modal */
+  .set-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .set-count,
+  .set-reps,
+  .dropset-count {
+    width: 3.5rem;
+    padding: 0.5rem;
+    background: var(--color-black);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    color: var(--color-text-primary);
+    text-align: center;
+    font-size: 0.875rem;
+  }
+
+  .set-count:focus,
+  .set-reps:focus,
+  .dropset-count:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  .set-group-label {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+  }
+
+  .set-reps-type {
+    padding: 0.5rem 0.75rem;
+    background: var(--color-black);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    color: var(--color-text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .set-reps-type:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  .dropset-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    cursor: pointer;
+  }
+
+  .dropset-toggle input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+  }
+
+  .remove-set-group {
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .remove-set-group:hover {
+    color: var(--color-danger);
+  }
 }

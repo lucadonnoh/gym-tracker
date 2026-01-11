@@ -198,9 +198,9 @@ export class MeasurementsScreen extends BaseScreen {
 
     this.$measurementsCharts.innerHTML = chartsToRender
       .map(f => `
-        <div class="bg-surface border border-border rounded-lg p-4 mb-4 min-h-[200px]">
+        <div class="bg-surface border border-border rounded-lg p-4 mb-4">
           <div class="text-[0.8125rem] font-medium text-text-secondary mb-2">${f.label}</div>
-          <canvas id="chart-${f.key}"></canvas>
+          <div class="h-[150px]"><canvas id="chart-${f.key}"></canvas></div>
         </div>
       `)
       .join('');

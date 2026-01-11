@@ -20,6 +20,7 @@ export function initializeDatabase(): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      is_admin INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -32,6 +33,9 @@ export function initializeDatabase(): void {
 
   // Add pr_count column if missing (for existing databases)
   migrateSessionsPrCount();
+
+  // Add is_admin column if missing
+  migrateUsersIsAdmin();
 
   // Now create tables - will skip if they exist (after migration added user_id)
   db.exec(`
@@ -241,6 +245,23 @@ function migrateSessionsPrCount(): void {
   }
 }
 
+function migrateUsersIsAdmin(): void {
+  const usersInfo = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  const columns = usersInfo.map(col => col.name);
+
+  if (!columns.includes('is_admin')) {
+    console.log('Adding is_admin column to users table...');
+    try {
+      db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0');
+      // Set donnoh as admin
+      db.exec("UPDATE users SET is_admin = 1 WHERE username = 'donnoh'");
+      console.log('Set donnoh as admin.');
+    } catch (e) {
+      console.error('Failed to add is_admin column:', e);
+    }
+  }
+}
+
 // Run migration for existing data - creates donnoh user and assigns orphaned data
 export function migrateExistingData(): void {
   const userCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
@@ -252,9 +273,9 @@ export function migrateExistingData(): void {
     if (orphanedDays > 0) {
       console.log('Migrating existing data to user "donnoh"...');
 
-      // Create donnoh user
+      // Create donnoh user (as admin)
       const passwordHash = bcrypt.hashSync('1234', BCRYPT_ROUNDS);
-      const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('donnoh', passwordHash);
+      const result = db.prepare('INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, 1)').run('donnoh', passwordHash);
       const userId = Number(result.lastInsertRowid);
 
       // Update all existing data to belong to donnoh
@@ -284,7 +305,7 @@ export function createUser(username: string, password: string): User {
 }
 
 export function getUserById(id: number): User | undefined {
-  return db.prepare('SELECT id, username, created_at FROM users WHERE id = ?').get(id) as User | undefined;
+  return db.prepare('SELECT id, username, is_admin, created_at FROM users WHERE id = ?').get(id) as User | undefined;
 }
 
 export function getUserByUsername(username: string): (User & { password_hash: string }) | undefined {
@@ -299,6 +320,10 @@ export function updatePassword(userId: number, newPassword: string): boolean {
   const passwordHash = bcrypt.hashSync(newPassword, BCRYPT_ROUNDS);
   const result = db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
   return result.changes > 0;
+}
+
+export function getAllUsers(): User[] {
+  return db.prepare('SELECT id, username, is_admin, created_at FROM users ORDER BY created_at').all() as User[];
 }
 
 // Workout Days

@@ -11,6 +11,8 @@ import {
   verifyPassword,
   updatePassword,
   getUserById,
+  createUser,
+  getAllUsers,
   getAllDays,
   getDayById,
   createDay,
@@ -58,7 +60,7 @@ const JWT_EXPIRY = '30d';
 
 // Extend Express Request to include user
 interface AuthRequest extends Request {
-  user?: { id: number; username: string };
+  user?: { id: number; username: string; is_admin: boolean };
 }
 
 app.use(morgan('combined'));
@@ -100,7 +102,12 @@ function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const token = authHeader.substring(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: number; username: string };
-    req.user = { id: decoded.userId, username: decoded.username };
+    // Fetch fresh user data to get is_admin status
+    const user = getUserById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    req.user = { id: user.id, username: user.username, is_admin: !!user.is_admin };
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
@@ -402,8 +409,40 @@ app.put('/api/stats/weekly-goal', authMiddleware, (req: AuthRequest, res: Respon
   res.json({ goal: getWeeklyGoal(req.user!.id) });
 });
 
-// Admin/Debug endpoints (no auth - for debugging)
-app.get('/api/admin/db-stats', (_req, res) => {
+// Admin endpoints (requires admin user)
+const adminMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user?.is_admin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+};
+
+app.get('/api/admin/users', authMiddleware, adminMiddleware, (_req: AuthRequest, res: Response) => {
+  const users = getAllUsers();
+  res.json(users);
+});
+
+app.post('/api/admin/users', authMiddleware, adminMiddleware, (req: AuthRequest, res: Response) => {
+  const { username } = req.body;
+  if (!username || typeof username !== 'string' || username.trim().length < 2) {
+    return res.status(400).json({ error: 'Username must be at least 2 characters' });
+  }
+
+  const existing = getUserByUsername(username.trim());
+  if (existing) {
+    return res.status(409).json({ error: 'Username already exists' });
+  }
+
+  try {
+    const user = createUser(username.trim(), '1234');
+    res.status(201).json({ id: user.id, username: user.username });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// Debug endpoints (admin only)
+app.get('/api/admin/db-stats', authMiddleware, adminMiddleware, (_req: AuthRequest, res: Response) => {
   const dbPath = process.env.DATABASE_PATH || join(__dirname, '..', 'gym.db');
 
   try {

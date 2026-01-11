@@ -29,7 +29,7 @@ export function renderDayButton(day: WorkoutDay): string {
     }
   }
   return `
-    <button class="w-full p-4 bg-surface border border-border rounded-lg text-left flex justify-between items-center active:bg-surface-elevated" onclick="app.startSession(${day.id})">
+    <button class="w-full px-4 py-3 text-left flex justify-between items-center border-b border-border last:border-b-0 active:bg-surface-elevated" onclick="app.startSession(${day.id})">
       <span class="font-semibold text-text-primary">${day.display_name}</span>
       ${daysAgoText ? `<span class="text-sm text-text-muted">${daysAgoText}</span>` : ''}
     </button>
@@ -301,8 +301,9 @@ function renderDropsetRow(exercise: ExerciseWithSets, expected: ParsedSet, lastS
 
 export function renderExtraSetRow(exercise: ExerciseWithSets, logged: SetLog): string {
   return `
-    <div class="flex items-center gap-2 p-3 bg-accent-surface border border-accent rounded-lg" data-exercise="${exercise.id}" data-set="${logged.set_number}">
-      <span class="text-sm text-text-muted w-12">Set ${logged.set_number}</span>
+    <div class="flex items-center gap-2 p-3 bg-accent-surface border border-dashed border-accent rounded-lg" data-exercise="${exercise.id}" data-set="${logged.set_number}" data-extra="true">
+      <button class="w-6 h-6 text-text-muted text-base hover:text-danger" onclick="app.removeExtraSet(${exercise.id}, ${logged.set_number})">×</button>
+      <span class="text-sm text-text-muted w-12">Extra</span>
       <input type="number" class="w-14 p-2 bg-black border border-accent rounded text-center text-sm"
         value="${logged.reps || 10}"
         inputmode="numeric"
@@ -346,9 +347,8 @@ export function renderSummaryStats(stats: SummaryStats): string {
     const jsDay = [1, 2, 3, 4, 5, 6, 0][i];
     const isCompleted = workoutDays.includes(jsDay);
     const isToday = new Date().getDay() === jsDay;
-    const bgClass = isCompleted ? 'bg-accent text-black' : 'bg-surface text-text-muted';
-    const borderClass = isToday ? 'ring-2 ring-accent ring-offset-1 ring-offset-black' : '';
-    return `<div class="w-8 h-8 flex items-center justify-center rounded text-xs font-medium ${bgClass} ${borderClass}">${label}</div>`;
+    const bgClass = isCompleted ? 'bg-accent text-black' : isToday ? 'bg-black text-accent' : 'bg-black text-text-muted';
+    return `<div class="flex-1 h-9 flex items-center justify-center text-xs font-semibold ${bgClass}">${label}</div>`;
   }).join('');
 
   return `
@@ -373,7 +373,7 @@ export function renderSummaryStats(stats: SummaryStats): string {
           <span class="text-sm font-medium text-text-secondary">This Week</span>
           <button class="px-3 py-1 bg-black border border-border rounded text-sm text-text-primary" onclick="app.editWeeklyGoal()">${workoutDays.length}/${stats.weeklyGoal}</button>
         </div>
-        <div class="flex justify-between">${weekDaysHtml}</div>
+        <div class="flex rounded-lg overflow-hidden border border-border">${weekDaysHtml}</div>
         ${weekComplete ? '<div class="mt-3 text-center text-sm text-accent font-medium">Week completed!</div>' : ''}
       </div>
     </div>
