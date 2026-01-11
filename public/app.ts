@@ -10,9 +10,7 @@ import type {
   ExerciseStats,
   ParsedSet,
   SetGroup,
-  BodyMeasurement,
   MeasurementFieldConfig,
-  SummaryStats,
   User
 } from './types.js';
 import { MEASUREMENT_FIELDS } from './types.js';
@@ -40,12 +38,8 @@ class GymTrackerApp {
   private currentExercises: ExerciseWithSets[] = [];
   private viewingSessionId: number | null = null;
   private viewingMeasurementId: number | null = null;
-  private editingSetId: number | null = null;
-  private addingSetExerciseId: number | null = null;
-  private addingSetNumber: number | null = null;
   private setGroups: SetGroup[] = [];
   private navigationStack: string[] = ['home-screen'];
-  private currentRouteParams: { [key: string]: string } = {};
 
   // Route definitions: screen -> URL path
   private static routes: { [screen: string]: string } = {
@@ -66,7 +60,6 @@ class GymTrackerApp {
 
   // Charts (array for multiple exercise charts)
   private progressCharts: any[] = [];
-  private measurementCharts: any[] = [];
 
   // Screen manager for modular screen components
   private screenManager: ScreenManager;
@@ -80,9 +73,6 @@ class GymTrackerApp {
   private get $sessionDayName() { return document.getElementById('session-day-name'); }
   private get $sessionTimer() { return document.getElementById('session-timer'); }
   private get $exerciseList() { return document.getElementById('exercise-list'); }
-  private get $sessionHistory() { return document.getElementById('session-history'); }
-  private get $detailSessionTitle() { return document.getElementById('detail-session-title'); }
-  private get $sessionDetailContent() { return document.getElementById('session-detail-content'); }
   private get $progressDaySelect() { return document.getElementById('progress-day-select') as HTMLSelectElement; }
   private get $progressCharts() { return document.getElementById('progress-charts'); }
   private get $manageDaySelect() { return document.getElementById('manage-day-select') as HTMLSelectElement; }
@@ -90,12 +80,6 @@ class GymTrackerApp {
   private get $addExerciseBtn() { return document.getElementById('add-exercise-btn'); }
   private get $exerciseModal() { return document.getElementById('exercise-modal'); }
   private get $restTimerModal() { return document.getElementById('rest-timer-modal'); }
-  private get $editSetModal() { return document.getElementById('edit-set-modal'); }
-  private get $measurementsSummary() { return document.getElementById('measurements-summary'); }
-  private get $measurementsCharts() { return document.getElementById('measurements-charts'); }
-  private get $measurementsHistory() { return document.getElementById('measurements-history'); }
-  private get $measurementDetailTitle() { return document.getElementById('measurement-detail-title'); }
-  private get $measurementDetailContent() { return document.getElementById('measurement-detail-content'); }
   private get $measurementModal() { return document.getElementById('measurement-modal'); }
   private get $measurementFormFields() { return document.getElementById('measurement-form-fields'); }
   private get $settingsModal() { return document.getElementById('settings-modal'); }
@@ -233,14 +217,6 @@ class GymTrackerApp {
   // ===================
   // Session Management
   // ===================
-
-  private async checkActiveSession(): Promise<void> {
-    const session = await api.getActiveSession();
-    if (session) {
-      this.currentSession = session;
-      this.$activeSessionBanner?.classList.remove('hidden');
-    }
-  }
 
   async startSession(dayId: number): Promise<void> {
     try {
@@ -818,8 +794,6 @@ class GymTrackerApp {
   }
 
   private async navigateToScreen(screen: string, params: { [key: string]: string }, updateHistory: boolean): Promise<void> {
-    this.currentRouteParams = params;
-
     // Check if screen is managed by ScreenManager (most screens are now)
     if (this.screenManager.has(screen)) {
       await this.screenManager.navigateTo(screen, params, updateHistory);
@@ -1108,92 +1082,63 @@ class GymTrackerApp {
   }
 
   // ===================
-  // Edit Set Modal
+  // Inline Set Editing (History View)
   // ===================
 
-  openEditSetModal(setId: number, weight: number, reps: number): void {
-    this.editingSetId = setId;
+  private inlineEditState: { setId: number | null; exerciseId: number; setNumber: number | null; originalHtml: string } | null = null;
 
-    const weightEl = document.getElementById('edit-set-weight') as HTMLInputElement;
-    const repsEl = document.getElementById('edit-set-reps') as HTMLInputElement;
-    const setIdEl = document.getElementById('edit-set-id') as HTMLInputElement;
+  editSetInline(setId: number | null, exerciseId: number, setNumber: number | null, weight: number = 0, reps: number = 0): void {
+    // Cancel any existing inline edit first
+    this.cancelSetInline();
 
-    if (!weightEl || !repsEl || !setIdEl) return;
+    const targetId = setId ? `set-${setId}` : `add-set-${exerciseId}`;
+    const target = document.getElementById(targetId);
+    if (!target) return;
 
-    setIdEl.value = setId.toString();
-    weightEl.value = weight.toString();
-    repsEl.value = reps.toString();
+    this.inlineEditState = { setId, exerciseId, setNumber, originalHtml: target.outerHTML };
+    target.outerHTML = templates.renderHistorySetEditor(setId, exerciseId, setNumber, weight, reps);
 
-    this.$editSetModal?.classList.remove('hidden');
-    weightEl.focus();
-    weightEl.select();
+    document.getElementById('edit-weight')?.focus();
   }
 
-  closeEditSetModal(): void {
-    this.$editSetModal?.classList.add('hidden');
-    this.editingSetId = null;
-    this.addingSetExerciseId = null;
-    this.addingSetNumber = null;
+  cancelSetInline(): void {
+    if (!this.inlineEditState) return;
+    const editor = document.getElementById('set-editor');
+    if (editor && this.inlineEditState.originalHtml) {
+      editor.outerHTML = this.inlineEditState.originalHtml;
+    }
+    this.inlineEditState = null;
   }
 
-  openAddSetModal(exerciseId: number, setNumber: number): void {
-    this.addingSetExerciseId = exerciseId;
-    this.addingSetNumber = setNumber;
-    this.editingSetId = null;
-
-    const weightEl = document.getElementById('edit-set-weight') as HTMLInputElement;
-    const repsEl = document.getElementById('edit-set-reps') as HTMLInputElement;
-    const setIdEl = document.getElementById('edit-set-id') as HTMLInputElement;
-
-    if (!weightEl || !repsEl || !setIdEl) return;
-
-    setIdEl.value = '';
-    weightEl.value = '';
-    repsEl.value = '';
-
-    this.$editSetModal?.classList.remove('hidden');
-    weightEl.focus();
-  }
-
-  async updateSet(event: Event): Promise<void> {
-    event.preventDefault();
+  async saveSetInline(setId: number | null, exerciseId: number, setNumber: number | null): Promise<void> {
     if (!this.viewingSessionId) return;
 
-    const weightVal = (document.getElementById('edit-set-weight') as HTMLInputElement).value.replace(',', '.');
-    const weightParsed = parseFloat(weightVal);
-    const weight = isNaN(weightParsed) ? null : weightParsed;
-    const repsParsed = parseInt((document.getElementById('edit-set-reps') as HTMLInputElement).value);
-    const reps = isNaN(repsParsed) ? null : repsParsed;
+    const weightVal = (document.getElementById('edit-weight') as HTMLInputElement)?.value.replace(',', '.') || '';
+    const repsVal = (document.getElementById('edit-reps') as HTMLInputElement)?.value || '';
+    const weight = parseFloat(weightVal) || null;
+    const reps = parseInt(repsVal) || null;
 
     try {
-      if (this.addingSetExerciseId && this.addingSetNumber) {
-        // Adding a new set
-        await api.logSet(this.viewingSessionId, this.addingSetExerciseId, this.addingSetNumber, weight, reps);
-      } else if (this.editingSetId) {
-        // Updating existing set
-        await api.updateSet(this.editingSetId, weight, reps);
-      } else {
-        return;
+      if (setId) {
+        await api.updateSet(setId, weight, reps);
+      } else if (setNumber) {
+        await api.logSet(this.viewingSessionId, exerciseId, setNumber, weight, reps);
       }
-      this.closeEditSetModal();
+      this.inlineEditState = null;
       await this.showSessionDetail(this.viewingSessionId);
     } catch (err) {
       alert('Failed to save set');
-      console.error(err);
     }
   }
 
-  async deleteSet(): Promise<void> {
-    if (!this.editingSetId || !this.viewingSessionId) return;
-    if (!confirm('Delete this set?')) return;
-
+  async deleteSetInline(setId: number): Promise<void> {
+    if (!this.viewingSessionId || !confirm('Delete this set?')) return;
     try {
-      await api.deleteSet(this.editingSetId);
-      this.closeEditSetModal();
+      await api.deleteSet(setId);
+      this.inlineEditState = null;
       await this.showSessionDetail(this.viewingSessionId);
     } catch (err) {
       alert('Failed to delete set');
-      console.error(err);
     }
   }
 
@@ -1265,7 +1210,7 @@ class GymTrackerApp {
     for (const exercise of exercises) {
       const data = await api.getProgress(exercise.id);
       if (data.length > 0) {
-        this.renderExerciseCharts(exercise.id, exercise.name, data);
+        this.renderExerciseCharts(exercise.id, data);
       } else {
         const container = document.getElementById(`progress-exercise-${exercise.id}`);
         const chartsDiv = container?.querySelector('.progress-exercise-charts');
@@ -1283,7 +1228,7 @@ class GymTrackerApp {
     this.progressCharts = [];
   }
 
-  private renderExerciseCharts(exerciseId: number, exerciseName: string, data: { date: string; maxWeight: number; totalReps: number }[]): void {
+  private renderExerciseCharts(exerciseId: number, data: { date: string; maxWeight: number; totalReps: number }[]): void {
     const labels = data.map(d => d.date);
     const weights = data.map(d => d.maxWeight);
     const reps = data.map(d => d.totalReps);
@@ -1376,126 +1321,6 @@ class GymTrackerApp {
 
   async showMeasurements(): Promise<void> {
     await this.screenManager.navigateTo('measurements-screen');
-  }
-
-  private async loadMeasurements(): Promise<void> {
-    const [measurements, latest] = await Promise.all([
-      api.getMeasurements(),
-      api.getLatestMeasurement()
-    ]);
-
-    // Render summary using config
-    if (this.$measurementsSummary && latest) {
-      const stats = MEASUREMENT_FIELDS
-        .filter(f => latest[f.key] !== null)
-        .slice(0, 5) // Show max 5 stats in summary
-        .map(f => `<div class="measurement-stat"><span class="stat-value">${latest[f.key]}</span><span class="stat-label">${f.unit} ${f.label.toLowerCase()}</span></div>`)
-        .join('');
-
-      this.$measurementsSummary.innerHTML = `
-        <div class="measurement-summary-card">
-          <div class="measurement-summary-date">Last: ${new Date(latest.measured_at).toLocaleDateString()}</div>
-          <div class="measurement-summary-stats">${stats}</div>
-        </div>
-      `;
-    } else if (this.$measurementsSummary) {
-      this.$measurementsSummary.innerHTML = '';
-    }
-
-    // Render charts
-    await this.renderMeasurementCharts(measurements);
-
-    // Render history
-    if (this.$measurementsHistory) {
-      if (measurements.length === 0) {
-        this.$measurementsHistory.innerHTML = '<p class="no-data">No measurements yet</p>';
-      } else {
-        this.$measurementsHistory.innerHTML = measurements.map(m => {
-          const details = MEASUREMENT_FIELDS
-            .filter(f => m[f.key] !== null)
-            .slice(0, 2)
-            .map(f => `${m[f.key]} ${f.unit}`)
-            .join(' • ') || 'Measurements recorded';
-          return `
-            <div class="measurement-history-item" onclick="app.showMeasurementDetail(${m.id})">
-              <div class="measurement-history-date">${new Date(m.measured_at).toLocaleDateString()}</div>
-              <div class="measurement-history-details">${details}</div>
-            </div>
-          `;
-        }).join('');
-      }
-    }
-  }
-
-  private async renderMeasurementCharts(measurements: BodyMeasurement[]): Promise<void> {
-    if (measurements.length === 0 || !this.$measurementsCharts) {
-      if (this.$measurementsCharts) this.$measurementsCharts.innerHTML = '';
-      return;
-    }
-
-    this.destroyMeasurementCharts();
-
-    const sorted = [...measurements].sort((a, b) =>
-      new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime()
-    );
-    const labels = sorted.map(m => new Date(m.measured_at).toLocaleDateString());
-
-    // Use config to build charts
-    const chartsToRender = MEASUREMENT_FIELDS.filter(f => {
-      const values = sorted.map(m => m[f.key] as number | null);
-      return values.some(v => v !== null);
-    });
-
-    this.$measurementsCharts.innerHTML = chartsToRender
-      .map(f => `<div class="measurement-chart"><h3>${f.label} (${f.unit})</h3><canvas id="chart-${f.key}"></canvas></div>`)
-      .join('');
-
-    for (const field of chartsToRender) {
-      const values = sorted.map(m => m[field.key] as number | null);
-      const ctx = document.getElementById(`chart-${field.key}`) as HTMLCanvasElement;
-      if (ctx) {
-        const chart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: `${field.label} (${field.unit})`,
-              data: values,
-              borderColor: field.color,
-              backgroundColor: field.color + '1A',
-              fill: true,
-              tension: 0.3,
-              spanGaps: true,
-              pointBackgroundColor: field.color,
-              pointBorderColor: field.color,
-              pointRadius: 3
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-              x: {
-                ticks: { color: '#555555', font: { family: 'Outfit', size: 10 } },
-                grid: { color: '#1a1a1a' }
-              },
-              y: {
-                ticks: { color: '#555555', font: { family: 'Outfit', size: 10 } },
-                grid: { color: '#1a1a1a' }
-              }
-            }
-          }
-        });
-        this.measurementCharts.push(chart);
-      }
-    }
-  }
-
-  private destroyMeasurementCharts(): void {
-    for (const chart of this.measurementCharts) {
-      chart.destroy();
-    }
-    this.measurementCharts = [];
   }
 
   async showMeasurementDetail(id: number): Promise<void> {

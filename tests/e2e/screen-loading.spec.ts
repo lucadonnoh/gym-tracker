@@ -46,7 +46,7 @@ test.describe('Screen Loading', () => {
     expect(scrollBefore).toBeGreaterThan(0);
 
     // Navigate to History
-    await page.locator('.bottom-nav button:has-text("History")').click();
+    await page.locator('#home-screen button:has-text("History")').click();
     await expect(page.locator('#history-screen')).toHaveClass(/active/, { timeout: 2000 });
 
     // Wait for content to fully load and any async operations to complete
@@ -60,7 +60,7 @@ test.describe('Screen Loading', () => {
 
   test('History screen should load content and not show loading forever', async ({ page }) => {
     // Navigate to History
-    await page.locator('.bottom-nav button:has-text("History")').click();
+    await page.locator('#home-screen button:has-text("History")').click();
 
     // Wait for screen to be active
     await expect(page.locator('#history-screen')).toHaveClass(/active/, { timeout: 2000 });
@@ -83,7 +83,7 @@ test.describe('Screen Loading', () => {
 
   test('Body Measurements screen should load content without JS errors', async ({ page }) => {
     // Navigate to Body Measurements
-    await page.locator('.bottom-nav button:has-text("Body")').click();
+    await page.locator('#home-screen button:has-text("Body")').click();
 
     // Wait for screen to be active
     await expect(page.locator('#measurements-screen')).toHaveClass(/active/, { timeout: 2000 });
@@ -110,7 +110,7 @@ test.describe('Screen Loading', () => {
 
   test('Progress screen should load content and not show loading forever', async ({ page }) => {
     // Navigate to Progress
-    await page.locator('.bottom-nav button:has-text("Progress")').click();
+    await page.locator('#home-screen button:has-text("Progress")').click();
 
     // Wait for screen to be active
     await expect(page.locator('#progress-screen')).toHaveClass(/active/, { timeout: 2000 });
@@ -130,7 +130,7 @@ test.describe('Screen Loading', () => {
 
   test('Manage screen should load content and not show loading forever', async ({ page }) => {
     // Navigate to Manage
-    await page.locator('.bottom-nav button:has-text("Manage")').click();
+    await page.locator('#home-screen button:has-text("Manage")').click();
 
     // Wait for screen to be active
     await expect(page.locator('#manage-screen')).toHaveClass(/active/, { timeout: 2000 });

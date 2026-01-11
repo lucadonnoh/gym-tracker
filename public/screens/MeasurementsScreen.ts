@@ -54,9 +54,9 @@ export class MeasurementsScreen extends BaseScreen {
 
     if (measurements.length === 0) {
       this.$measurementsSummary.innerHTML = `
-        <div class="measurements-empty-state">
+        <div class="text-center py-8 text-text-muted">
           <p>No measurements recorded yet</p>
-          <p class="hint">Track your progress by adding your first measurement</p>
+          <p class="text-sm mt-1">Track your progress by adding your first measurement</p>
         </div>
       `;
       return;
@@ -67,24 +67,24 @@ export class MeasurementsScreen extends BaseScreen {
     const latestDate = new Date(measurements[0].measured_at).toLocaleDateString();
 
     this.$measurementsSummary.innerHTML = `
-      <div class="measurements-summary-grid">
+      <div class="grid grid-cols-2 gap-2 mb-4">
         ${keyMetrics.map(m => `
-          <div class="metric-card ${m.changeClass}">
-            <div class="metric-label">${m.label}</div>
-            <div class="metric-value">${m.value}<span class="metric-unit">${m.unit}</span></div>
+          <div class="bg-surface border ${m.borderClass} rounded-lg p-3 text-center">
+            <div class="text-xs text-text-muted uppercase tracking-wider mb-1">${m.label}</div>
+            <div class="text-[1.75rem] font-bold">${m.value}<span class="text-base font-normal text-text-secondary ml-0.5">${m.unit}</span></div>
             ${m.change !== null ? `
-              <div class="metric-change">
-                <span class="change-arrow">${m.changeDirection}</span>
-                <span class="change-value">${m.changeText}</span>
-                <span class="change-period">this month</span>
+              <div class="flex items-center justify-center gap-1 mt-1 text-[0.8125rem]">
+                <span class="${m.arrowClass} font-semibold">${m.changeDirection}</span>
+                <span class="font-semibold text-text-primary">${m.changeText}</span>
+                <span class="text-text-muted text-xs">this month</span>
               </div>
             ` : `
-              <div class="metric-change no-data">No prior data this month</div>
+              <div class="mt-1 text-[0.6875rem] text-text-muted italic">No prior data this month</div>
             `}
           </div>
         `).join('')}
       </div>
-      <div class="last-measured">Last measured: ${latestDate}</div>
+      <div class="text-center text-[0.8125rem] text-text-muted mb-6">Last measured: ${latestDate}</div>
     `;
   }
 
@@ -95,7 +95,8 @@ export class MeasurementsScreen extends BaseScreen {
     change: number | null;
     changeText: string;
     changeDirection: string;
-    changeClass: string;
+    borderClass: string;
+    arrowClass: string;
   }> {
     const metrics: Array<{
       label: string;
@@ -104,7 +105,8 @@ export class MeasurementsScreen extends BaseScreen {
       change: number | null;
       changeText: string;
       changeDirection: string;
-      changeClass: string;
+      borderClass: string;
+      arrowClass: string;
     }> = [];
 
     // Fields where decrease is good (fat loss indicators)
@@ -139,20 +141,23 @@ export class MeasurementsScreen extends BaseScreen {
 
       const change = oldValue != null ? value - oldValue : null;
 
-      let changeClass = '';
+      let borderClass = 'border-border';
+      let arrowClass = 'text-text-muted';
+
       if (change !== null && change !== 0) {
         if (neutralChange.includes(field.key)) {
-          // Weight: just show direction, no good/bad
-          changeClass = change > 0 ? 'change-up' : 'change-down';
+          // Weight: just show direction with accent color
+          borderClass = 'border-accent';
+          arrowClass = 'text-accent';
         } else if (decreaseIsGood.includes(field.key)) {
-          // Waist/Hips: down is good
-          changeClass = change > 0 ? 'change-up-bad' : 'change-down-good';
+          // Waist/Hips: down is good (green), up is bad (red)
+          borderClass = change > 0 ? 'border-danger' : 'border-accent';
+          arrowClass = change > 0 ? 'text-danger' : 'text-accent';
         } else {
-          // Muscle measurements: up is good
-          changeClass = change > 0 ? 'change-up-good' : 'change-down-bad';
+          // Muscle measurements: up is good (green), down is bad (red)
+          borderClass = change > 0 ? 'border-accent' : 'border-danger';
+          arrowClass = change > 0 ? 'text-accent' : 'text-danger';
         }
-      } else if (change === 0) {
-        changeClass = 'change-neutral';
       }
 
       metrics.push({
@@ -162,7 +167,8 @@ export class MeasurementsScreen extends BaseScreen {
         change,
         changeText: change !== null ? `${Math.abs(change).toFixed(1)} ${field.unit}` : '',
         changeDirection: change !== null ? (change > 0 ? '↑' : change < 0 ? '↓' : '→') : '',
-        changeClass
+        borderClass,
+        arrowClass
       });
     }
 
@@ -174,7 +180,7 @@ export class MeasurementsScreen extends BaseScreen {
 
     if (measurements.length < 2) {
       this.$measurementsCharts.innerHTML = `
-        <div class="charts-empty-state">
+        <div class="text-center py-6 text-text-muted text-sm">
           <p>Add more measurements to see progress charts</p>
         </div>
       `;
@@ -192,8 +198,8 @@ export class MeasurementsScreen extends BaseScreen {
 
     this.$measurementsCharts.innerHTML = chartsToRender
       .map(f => `
-        <div class="chart-container">
-          <div class="chart-title">${f.label}</div>
+        <div class="bg-surface border border-border rounded-lg p-4 mb-4 min-h-[200px]">
+          <div class="text-[0.8125rem] font-medium text-text-secondary mb-2">${f.label}</div>
           <canvas id="chart-${f.key}"></canvas>
         </div>
       `)
@@ -266,12 +272,12 @@ export class MeasurementsScreen extends BaseScreen {
     if (!this.$measurementsHistory) return;
 
     if (measurements.length === 0) {
-      this.$measurementsHistory.innerHTML = '<p class="no-data">No measurements yet</p>';
+      this.$measurementsHistory.innerHTML = '<p class="text-center py-6 text-text-muted">No measurements yet</p>';
       return;
     }
 
     this.$measurementsHistory.innerHTML = `
-      <h3 class="history-title">History</h3>
+      <h3 class="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">History</h3>
       ${measurements.map((m, i) => {
         const prev = measurements[i + 1]; // Previous measurement (older)
         return this.renderHistoryItem(m, prev);
@@ -290,7 +296,8 @@ export class MeasurementsScreen extends BaseScreen {
         const diff = m.weight - prev.weight;
         if (diff !== 0) {
           const sign = diff > 0 ? '+' : '';
-          changeInfo = `<span class="history-change ${diff > 0 ? 'up' : 'down'}">${sign}${diff.toFixed(1)}</span>`;
+          const colorClass = diff > 0 ? 'text-accent' : 'text-danger';
+          changeInfo = `<span class="${colorClass} text-sm font-medium ml-2">${sign}${diff.toFixed(1)}</span>`;
         }
       }
     }
@@ -305,13 +312,13 @@ export class MeasurementsScreen extends BaseScreen {
       : '';
 
     return `
-      <div class="history-item" onclick="app.showMeasurementDetail(${m.id})">
-        <div class="history-item-date">${new Date(m.measured_at).toLocaleDateString()}</div>
-        <div class="history-item-main">
-          ${primaryInfo ? `<span class="history-weight">${primaryInfo}</span>` : ''}
+      <div class="bg-surface border border-border rounded-lg p-4 mb-2 cursor-pointer active:bg-surface-elevated" onclick="app.showMeasurementDetail(${m.id})">
+        <div class="font-semibold text-[0.9375rem]">${new Date(m.measured_at).toLocaleDateString()}</div>
+        <div class="flex items-center">
+          ${primaryInfo ? `<span class="text-text-secondary">${primaryInfo}</span>` : ''}
           ${changeInfo}
         </div>
-        ${secondaryInfo ? `<div class="history-item-secondary">${secondaryInfo}</div>` : ''}
+        ${secondaryInfo ? `<div class="text-[0.8125rem] text-text-muted mt-1">${secondaryInfo}</div>` : ''}
       </div>
     `;
   }

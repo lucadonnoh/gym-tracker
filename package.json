@@ -7,8 +7,11 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "seed": "tsx src/seed.ts",
+    "build:css": "tailwindcss -i public/tailwind.css -o public/style.css --minify",
+    "build:css:watch": "tailwindcss -i public/tailwind.css -o public/style.css --watch",
     "build:frontend": "esbuild public/app.ts --bundle --outfile=public/app.js --minify",
     "build:frontend:ts": "tsc --noEmit -p tsconfig.frontend.json && npm run build:frontend",
+    "build": "npm run build:css && npm run build:frontend",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
@@ -23,6 +26,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@tailwindcss/cli": "^4.1.18",
     "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.11",
     "@types/express": "^5.0.0",
@@ -33,6 +37,7 @@
     "esbuild": "^0.24.0",
     "husky": "^9.1.7",
     "supertest": "^7.2.2",
+    "tailwindcss": "^4.1.18",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^4.0.16"

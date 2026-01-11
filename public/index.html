@@ -16,23 +16,28 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 </head>
 <body class="js-loading">
-  <div id="app">
+  <div id="app" class="max-w-[480px] mx-auto min-h-screen bg-black">
     <!-- Login Screen -->
     <div id="login-screen" class="screen active">
-      <main class="login-main">
-        <div class="login-container">
-          <h1 class="login-title">Gym Tracker</h1>
-          <form id="login-form" onsubmit="app.login(event)">
-            <label>
+      <main class="flex-1 flex items-center justify-center min-h-screen p-6">
+        <div class="w-full max-w-[320px]">
+          <h1 class="text-[1.75rem] font-semibold text-center mb-8 tracking-tight">Gym Tracker</h1>
+          <form id="login-form" onsubmit="app.login(event)" class="flex flex-col gap-4">
+            <label class="flex flex-col gap-1 text-[0.9375rem] text-text-secondary">
               Username
-              <input type="text" id="login-username" required autocomplete="username">
+              <input type="text" id="login-username" required autocomplete="username"
+                class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
             </label>
-            <label>
+            <label class="flex flex-col gap-1 text-[0.9375rem] text-text-secondary">
               Password
-              <input type="password" id="login-password" required autocomplete="current-password">
+              <input type="password" id="login-password" required autocomplete="current-password"
+                class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
             </label>
-            <div id="login-error" class="login-error hidden"></div>
-            <button type="submit" id="login-submit">Login</button>
+            <div id="login-error" class="hidden p-3 bg-danger-dim border border-danger rounded-lg text-danger text-sm text-center"></div>
+            <button type="submit" id="login-submit"
+              class="w-full p-4 bg-accent text-black font-semibold rounded-lg text-base mt-2 active:opacity-90">
+              Login
+            </button>
           </form>
         </div>
       </main>
@@ -40,26 +45,26 @@
 
     <!-- Home Screen -->
     <div id="home-screen" class="screen">
-      <header>
-        <h1>Gym Tracker</h1>
-        <button class="settings-btn" onclick="app.showSettings()">⚙</button>
+      <header class="bg-black text-text-primary p-4 flex items-center justify-between sticky top-0 z-10 border-b border-border">
+        <h1 class="text-lg font-semibold">Gym Tracker</h1>
+        <button class="settings-btn w-9 h-9 flex items-center justify-center bg-transparent border border-border text-text-secondary rounded-sm text-lg" onclick="app.showSettings()">⚙</button>
       </header>
-      <main>
-        <section id="active-session-banner" class="hidden">
-          <p>Active session in progress</p>
-          <button onclick="app.resumeSession()">Resume</button>
+      <main class="p-4">
+        <section id="active-session-banner" class="hidden bg-accent-surface border border-accent rounded-lg p-4 mb-4 flex items-center justify-between">
+          <p class="text-accent font-medium">Active session in progress</p>
+          <button onclick="app.resumeSession()" class="px-4 py-2 bg-accent text-black font-semibold rounded-lg text-sm">Resume</button>
         </section>
         <div id="home-content" class="loading">
-          <section id="stats-container"></section>
-          <section>
-            <h2>Start Workout</h2>
-            <div id="day-buttons"></div>
+          <section id="stats-container" class="mb-6"></section>
+          <section class="mb-6">
+            <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Start Workout</h2>
+            <div id="day-buttons" class="flex flex-col gap-2"></div>
           </section>
-          <nav class="bottom-nav">
-            <button onclick="app.showHistory()">History</button>
-            <button onclick="app.showProgress()">Progress</button>
-            <button onclick="app.showMeasurements()">Body</button>
-            <button onclick="app.showManage()">Manage</button>
+          <nav class="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-border">
+            <button onclick="app.showHistory()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">History</button>
+            <button onclick="app.showProgress()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Progress</button>
+            <button onclick="app.showMeasurements()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Body</button>
+            <button onclick="app.showManage()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Manage</button>
           </nav>
         </div>
       </main>
@@ -67,50 +72,53 @@
 
     <!-- Session Screen -->
     <div id="session-screen" class="screen">
-      <header>
-        <button class="back-btn" onclick="app.confirmEndSession()">End</button>
-        <h1 id="session-day-name">Workout</h1>
-        <button class="rest-btn" onclick="app.showRestTimer()">Rest</button>
-        <span id="session-timer">00:00:00</span>
+      <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
+        <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.confirmEndSession()">End</button>
+        <h1 id="session-day-name" class="flex-1 text-lg font-semibold truncate">Workout</h1>
+        <button class="rest-btn px-3 py-2 bg-transparent border border-accent text-accent rounded-sm text-sm font-medium" onclick="app.showRestTimer()">Rest</button>
+        <span id="session-timer" class="font-mono text-sm text-text-muted min-w-[70px] text-right">00:00:00</span>
       </header>
-      <main>
-        <div id="exercise-list"></div>
-        <button id="finish-session-btn" onclick="app.finishSession()">Finish Session</button>
-        <button id="cancel-session-btn" onclick="app.cancelSession()">Cancel Session</button>
+      <main class="p-4">
+        <div id="exercise-list" class="flex flex-col gap-4"></div>
+        <button id="finish-session-btn" onclick="app.finishSession()"
+          class="w-full p-4 bg-accent text-black font-semibold rounded-lg text-base mt-6 active:opacity-90">Finish Session</button>
+        <button id="cancel-session-btn" onclick="app.cancelSession()"
+          class="w-full p-3 bg-transparent border border-danger text-danger font-medium rounded-lg text-sm mt-3 active:bg-danger-dim">Cancel Session</button>
       </main>
     </div>
 
     <!-- History Screen -->
     <div id="history-screen" class="screen">
-      <header>
-        <button class="back-btn" onclick="app.goBack()">Back</button>
-        <h1>History</h1>
+      <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
+        <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
+        <h1 class="flex-1 text-lg font-semibold">History</h1>
       </header>
-      <main>
+      <main class="p-4">
         <div id="session-history"></div>
       </main>
     </div>
 
     <!-- Session Detail Screen -->
     <div id="session-detail-screen" class="screen">
-      <header>
-        <button class="back-btn" onclick="app.goBack()">Back</button>
-        <h1 id="detail-session-title">Session</h1>
-        <button class="delete-btn-header" onclick="app.deleteSession()">Delete</button>
+      <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
+        <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
+        <h1 id="detail-session-title" class="flex-1 text-lg font-semibold truncate">Session</h1>
+        <button class="delete-btn-header px-3 py-2 bg-transparent border border-danger-dim text-danger rounded-sm text-sm font-medium active:bg-danger-dim" onclick="app.deleteSession()">Delete</button>
       </header>
-      <main>
+      <main class="p-4">
         <div id="session-detail-content"></div>
       </main>
     </div>
 
     <!-- Progress Screen -->
     <div id="progress-screen" class="screen">
-      <header>
-        <button class="back-btn" onclick="app.goBack()">Back</button>
-        <h1>Progress</h1>
+      <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
+        <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
+        <h1 class="flex-1 text-lg font-semibold">Progress</h1>
       </header>
-      <main>
-        <select id="progress-day-select" onchange="app.loadDayProgress()">
+      <main class="p-4">
+        <select id="progress-day-select" onchange="app.loadDayProgress()"
+          class="w-full p-3 bg-surface border border-border rounded-lg text-base text-text-primary mb-4">
           <option value="">Select workout day...</option>
         </select>
         <div id="progress-charts"></div>
@@ -119,31 +127,34 @@
 
     <!-- Manage Screen -->
     <div id="manage-screen" class="screen">
-      <header>
-        <button class="back-btn" onclick="app.goBack()">Back</button>
-        <h1>Manage</h1>
+      <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
+        <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
+        <h1 class="flex-1 text-lg font-semibold">Manage</h1>
       </header>
-      <main>
-        <div class="manage-day-row">
-          <select id="manage-day-select" onchange="app.loadDayExercises()">
+      <main class="p-4">
+        <div class="flex gap-2 mb-4">
+          <select id="manage-day-select" onchange="app.loadDayExercises()"
+            class="flex-1 p-3 bg-surface border border-border rounded-lg text-base text-text-primary">
             <option value="">Select workout day...</option>
           </select>
-          <button id="add-day-btn" onclick="app.showAddDay()">+ Day</button>
+          <button id="add-day-btn" onclick="app.showAddDay()"
+            class="px-4 py-3 bg-transparent border border-accent text-accent font-medium rounded-lg text-sm whitespace-nowrap">+ Day</button>
         </div>
         <div id="manage-exercise-list"></div>
-        <button id="add-exercise-btn" class="hidden" onclick="app.showAddExercise()">+ Add Exercise</button>
+        <button id="add-exercise-btn" class="hidden w-full p-3 bg-accent text-black font-semibold rounded-lg mt-4" onclick="app.showAddExercise()">+ Add Exercise</button>
       </main>
     </div>
 
     <!-- Measurements Screen -->
     <div id="measurements-screen" class="screen">
-      <header>
-        <button class="back-btn" onclick="app.goBack()">Back</button>
-        <h1>Body Measurements</h1>
+      <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
+        <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
+        <h1 class="flex-1 text-lg font-semibold">Body Measurements</h1>
       </header>
-      <main>
+      <main class="p-4">
         <div id="measurements-summary"></div>
-        <button id="add-measurement-btn" onclick="app.showAddMeasurement()">+ Add Measurement</button>
+        <button id="add-measurement-btn" onclick="app.showAddMeasurement()"
+          class="w-full p-4 bg-accent text-black font-semibold rounded-lg text-base mb-6 active:opacity-90">+ Add Measurement</button>
         <div id="measurements-charts"></div>
         <div id="measurements-history"></div>
       </main>
@@ -151,30 +162,32 @@
 
     <!-- Measurement Detail Screen -->
     <div id="measurement-detail-screen" class="screen">
-      <header>
-        <button class="back-btn" onclick="app.goBack()">Back</button>
-        <h1 id="measurement-detail-title">Measurement</h1>
-        <button class="delete-btn-header" onclick="app.deleteMeasurement()">Delete</button>
+      <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
+        <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
+        <h1 id="measurement-detail-title" class="flex-1 text-lg font-semibold truncate">Measurement</h1>
+        <button class="delete-btn-header px-3 py-2 bg-transparent border border-danger-dim text-danger rounded-sm text-sm font-medium active:bg-danger-dim" onclick="app.deleteMeasurement()">Delete</button>
       </header>
-      <main>
+      <main class="p-4">
         <div id="measurement-detail-content"></div>
       </main>
     </div>
 
     <!-- Add/Edit Measurement Modal -->
     <div id="measurement-modal" class="modal hidden">
-      <div class="modal-content measurement-modal-content">
-        <h2 id="measurement-modal-title">Add Measurement</h2>
+      <div class="modal-content">
+        <h2 id="measurement-modal-title" class="text-xl font-semibold mb-6">Add Measurement</h2>
         <form id="measurement-form" onsubmit="app.saveMeasurement(event)">
           <input type="hidden" id="measurement-id">
-          <div id="measurement-form-fields"></div>
-          <label class="measurement-notes">
-            <span>Notes</span>
-            <textarea id="measurement-notes" rows="2"></textarea>
+          <div id="measurement-form-fields" class="grid grid-cols-2 gap-3"></div>
+          <label class="block mt-4">
+            <span class="text-sm text-text-secondary">Notes</span>
+            <textarea id="measurement-notes" rows="2"
+              class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary resize-none focus:outline-none focus:border-accent"></textarea>
           </label>
-          <div class="modal-actions">
-            <button type="button" onclick="app.closeMeasurementModal()">Cancel</button>
-            <button type="submit">Save</button>
+          <div class="flex gap-3 mt-6">
+            <button type="button" onclick="app.closeMeasurementModal()"
+              class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg">Cancel</button>
+            <button type="submit" class="flex-1 p-3 bg-accent text-black font-semibold rounded-lg">Save</button>
           </div>
         </form>
       </div>
@@ -183,33 +196,36 @@
     <!-- Add/Edit Exercise Modal -->
     <div id="exercise-modal" class="modal hidden">
       <div class="modal-content">
-        <h2 id="modal-title">Add Exercise</h2>
+        <h2 id="modal-title" class="text-xl font-semibold mb-6">Add Exercise</h2>
         <form id="exercise-form" onsubmit="app.saveExercise(event)">
           <input type="hidden" id="exercise-id">
           <input type="hidden" id="exercise-day-id">
-          <label>
-            Name
-            <input type="text" id="exercise-name" required>
+          <label class="block mb-4">
+            <span class="text-[0.9375rem] text-text-primary font-medium">Name</span>
+            <input type="text" id="exercise-name" required
+              class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
           </label>
-          <label>
-            Default Weight (kg)
-            <input type="text" id="exercise-weight" inputmode="decimal" placeholder="0.0">
+          <label class="block mb-4">
+            <span class="text-[0.9375rem] text-text-primary font-medium">Default Weight (kg)</span>
+            <input type="text" id="exercise-weight" inputmode="decimal" placeholder="0.0"
+              class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
           </label>
 
-          <div class="set-builder">
-            <label>Sets</label>
-            <div id="set-groups"></div>
-            <button type="button" class="add-set-group-btn" onclick="app.addSetGroup()">+ Add Set Group</button>
+          <div class="mb-4">
+            <label class="text-[0.9375rem] text-text-primary font-medium">Sets</label>
+            <div id="set-groups" class="mt-2 flex flex-col gap-2"></div>
+            <button type="button" class="mt-2 px-3 py-2 bg-transparent border border-border text-text-secondary rounded-lg text-sm" onclick="app.addSetGroup()">+ Add Set Group</button>
           </div>
 
-          <div class="description-preview">
-            <label>Preview</label>
-            <div id="description-preview-text"></div>
+          <div class="mb-4">
+            <label class="text-sm text-text-muted">Preview</label>
+            <div id="description-preview-text" class="mt-1 p-3 bg-surface border border-border rounded-lg text-sm text-text-secondary min-h-[44px]"></div>
           </div>
 
-          <div class="modal-actions">
-            <button type="button" onclick="app.closeModal()">Cancel</button>
-            <button type="submit">Save</button>
+          <div class="flex gap-3 mt-6">
+            <button type="button" onclick="app.closeModal()"
+              class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg">Cancel</button>
+            <button type="submit" class="flex-1 p-3 bg-accent text-black font-semibold rounded-lg">Save</button>
           </div>
         </form>
       </div>
@@ -218,40 +234,45 @@
     <!-- Day Modal -->
     <div id="day-modal" class="modal hidden">
       <div class="modal-content">
-        <h2>Add Workout Day</h2>
+        <h2 class="text-xl font-semibold mb-6">Add Workout Day</h2>
         <form id="day-form" onsubmit="app.saveDay(event)">
-          <label>
-            Name (e.g., "Chest & Triceps", "Leg Day")
-            <input type="text" id="day-display-name" required placeholder="Display name">
+          <label class="block mb-4">
+            <span class="text-[0.9375rem] text-text-primary font-medium">Name (e.g., "Chest & Triceps", "Leg Day")</span>
+            <input type="text" id="day-display-name" required placeholder="Display name"
+              class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
           </label>
-          <div id="day-error" class="form-error hidden"></div>
-          <div class="modal-actions">
-            <button type="button" onclick="app.closeModal()">Cancel</button>
-            <button type="submit">Save</button>
+          <div id="day-error" class="hidden p-3 bg-danger-dim border border-danger rounded-lg text-danger text-sm text-center mb-4"></div>
+          <div class="flex gap-3 mt-6">
+            <button type="button" onclick="app.closeModal()"
+              class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg">Cancel</button>
+            <button type="submit" class="flex-1 p-3 bg-accent text-black font-semibold rounded-lg">Save</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Set Input Modal (Simplified) -->
+    <!-- Set Input Modal -->
     <div id="set-modal" class="modal hidden">
       <div class="modal-content">
-        <div id="set-exercise-name" class="modal-subtitle"></div>
-        <h2 id="set-number">Set 1</h2>
+        <div id="set-exercise-name" class="text-base text-text-primary mb-2 font-medium"></div>
+        <h2 id="set-number" class="text-xl font-semibold mb-6">Set 1</h2>
         <form id="set-form" onsubmit="app.saveSet(event)">
           <input type="hidden" id="set-exercise-id">
           <input type="hidden" id="set-set-number">
-          <label>
-            Weight (kg)
-            <input type="text" id="set-weight" inputmode="decimal" placeholder="0.0">
+          <label class="block mb-4">
+            <span class="text-[0.9375rem] text-text-primary font-medium">Weight (kg)</span>
+            <input type="text" id="set-weight" inputmode="decimal" placeholder="0.0"
+              class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
           </label>
-          <label id="reps-row">
-            Reps
-            <input type="number" id="set-reps" inputmode="numeric">
+          <label id="reps-row" class="block mb-4">
+            <span class="text-[0.9375rem] text-text-primary font-medium">Reps</span>
+            <input type="number" id="set-reps" inputmode="numeric"
+              class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
           </label>
-          <div class="modal-actions">
-            <button type="button" onclick="app.closeSetModal()">Cancel</button>
-            <button type="submit">Save</button>
+          <div class="flex gap-3 mt-6">
+            <button type="button" onclick="app.closeSetModal()"
+              class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg">Cancel</button>
+            <button type="submit" class="flex-1 p-3 bg-accent text-black font-semibold rounded-lg">Save</button>
           </div>
         </form>
       </div>
@@ -259,54 +280,31 @@
 
     <!-- Rest Timer Modal -->
     <div id="rest-timer-modal" class="modal hidden">
-      <div class="modal-content rest-timer-content">
-        <div id="rest-timer-select" class="rest-timer-select">
-          <h2>Rest Timer</h2>
-          <div class="rest-timer-options">
-            <button type="button" onclick="app.startRestTimer(60)">1:00</button>
-            <button type="button" onclick="app.startRestTimer(90)">1:30</button>
-            <button type="button" onclick="app.startRestTimer(120)">2:00</button>
-            <button type="button" onclick="app.startRestTimer(180)">3:00</button>
+      <div class="modal-content text-center">
+        <div id="rest-timer-select">
+          <h2 class="text-xl font-semibold mb-6">Rest Timer</h2>
+          <div class="grid grid-cols-4 gap-2 mb-4">
+            <button type="button" onclick="app.startRestTimer(60)" class="p-4 bg-surface border border-border rounded-lg text-text-primary font-semibold">1:00</button>
+            <button type="button" onclick="app.startRestTimer(90)" class="p-4 bg-surface border border-border rounded-lg text-text-primary font-semibold">1:30</button>
+            <button type="button" onclick="app.startRestTimer(120)" class="p-4 bg-surface border border-border rounded-lg text-text-primary font-semibold">2:00</button>
+            <button type="button" onclick="app.startRestTimer(180)" class="p-4 bg-surface border border-border rounded-lg text-text-primary font-semibold">3:00</button>
           </div>
-          <div class="rest-timer-custom">
-            <input type="number" id="custom-rest-seconds" placeholder="seconds" min="10" max="600">
-            <button type="button" onclick="app.startCustomRestTimer()">Start</button>
+          <div class="flex gap-2 mb-4">
+            <input type="number" id="custom-rest-seconds" placeholder="seconds" min="10" max="600"
+              class="flex-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary text-center">
+            <button type="button" onclick="app.startCustomRestTimer()" class="px-6 py-3 bg-accent text-black font-semibold rounded-lg">Start</button>
           </div>
-          <button type="button" class="rest-timer-cancel" onclick="app.closeRestTimer()">Cancel</button>
+          <button type="button" class="w-full p-3 bg-transparent border border-border text-text-secondary rounded-lg" onclick="app.closeRestTimer()">Cancel</button>
         </div>
-        <div id="rest-timer-countdown" class="rest-timer-countdown hidden">
-          <div id="rest-timer-display">0:00</div>
-          <div class="rest-timer-extend">
-            <button type="button" onclick="app.extendRestTimer(10)">+10s</button>
-            <button type="button" onclick="app.extendRestTimer(30)">+30s</button>
-            <button type="button" onclick="app.extendRestTimer(60)">+1m</button>
+        <div id="rest-timer-countdown" class="hidden">
+          <div id="rest-timer-display" class="text-6xl font-bold text-accent mb-6 font-mono">0:00</div>
+          <div class="flex justify-center gap-2 mb-6">
+            <button type="button" onclick="app.extendRestTimer(10)" class="px-4 py-2 bg-surface border border-border rounded-lg text-text-secondary">+10s</button>
+            <button type="button" onclick="app.extendRestTimer(30)" class="px-4 py-2 bg-surface border border-border rounded-lg text-text-secondary">+30s</button>
+            <button type="button" onclick="app.extendRestTimer(60)" class="px-4 py-2 bg-surface border border-border rounded-lg text-text-secondary">+1m</button>
           </div>
-          <button type="button" class="rest-timer-stop" onclick="app.closeRestTimer()">Stop</button>
+          <button type="button" class="w-full p-4 bg-danger text-white font-semibold rounded-lg" onclick="app.closeRestTimer()">Stop</button>
         </div>
-      </div>
-    </div>
-
-    <!-- Edit Set Modal (for history) -->
-    <div id="edit-set-modal" class="modal hidden">
-      <div class="modal-content">
-        <h2>Edit Set</h2>
-        <form id="edit-set-form" onsubmit="app.updateSet(event)">
-          <input type="hidden" id="edit-set-id">
-          <input type="hidden" id="edit-session-id">
-          <label>
-            Weight (kg)
-            <input type="text" id="edit-set-weight" inputmode="decimal" placeholder="0.0">
-          </label>
-          <label>
-            Reps
-            <input type="number" id="edit-set-reps" inputmode="numeric">
-          </label>
-          <div class="modal-actions">
-            <button type="button" onclick="app.closeEditSetModal()">Cancel</button>
-            <button type="button" class="delete-btn" onclick="app.deleteSet()">Delete</button>
-            <button type="submit">Save</button>
-          </div>
-        </form>
       </div>
     </div>
 
@@ -317,10 +315,10 @@
 
     <!-- Exercise History Modal -->
     <div id="exercise-history-modal" class="modal hidden" onclick="if(event.target === this) app.closeExerciseHistory()">
-      <div class="modal-content exercise-history-content">
-        <div class="exercise-history-header">
-          <h2 id="exercise-history-title">Exercise History</h2>
-          <button class="close-btn" onclick="app.closeExerciseHistory()">&times;</button>
+      <div class="modal-content max-h-[80vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h2 id="exercise-history-title" class="text-xl font-semibold">Exercise History</h2>
+          <button class="w-8 h-8 flex items-center justify-center text-2xl text-text-muted hover:text-text-primary" onclick="app.closeExerciseHistory()">&times;</button>
         </div>
         <div id="exercise-history-list"></div>
       </div>
@@ -328,35 +326,38 @@
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal hidden">
-      <div class="modal-content settings-modal-content">
-        <h2>Settings</h2>
-        <div class="settings-user">
-          <span>Logged in as:</span>
-          <span id="settings-username"></span>
+      <div class="modal-content">
+        <h2 class="text-xl font-semibold mb-6">Settings</h2>
+        <div class="flex justify-between items-center py-3 border-b border-border mb-4">
+          <span class="text-text-muted">Logged in as:</span>
+          <span id="settings-username" class="text-text-primary font-medium"></span>
         </div>
-        <div class="settings-section">
-          <h3>Change Password</h3>
-          <form id="password-form" onsubmit="app.changePassword(event)">
-            <label>
-              Current Password
-              <input type="password" id="current-password" required autocomplete="current-password">
+        <div class="mb-6">
+          <h3 class="text-base font-medium text-text-primary mb-4">Change Password</h3>
+          <form id="password-form" onsubmit="app.changePassword(event)" class="flex flex-col gap-4">
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-text-secondary">Current Password</span>
+              <input type="password" id="current-password" required autocomplete="current-password"
+                class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
             </label>
-            <label>
-              New Password
-              <input type="password" id="new-password" required autocomplete="new-password">
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-text-secondary">New Password</span>
+              <input type="password" id="new-password" required autocomplete="new-password"
+                class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
             </label>
-            <label>
-              Confirm New Password
-              <input type="password" id="confirm-password" required autocomplete="new-password">
+            <label class="flex flex-col gap-1">
+              <span class="text-sm text-text-secondary">Confirm New Password</span>
+              <input type="password" id="confirm-password" required autocomplete="new-password"
+                class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
             </label>
-            <div id="password-error" class="password-error hidden"></div>
-            <div id="password-success" class="password-success hidden"></div>
-            <button type="submit">Update Password</button>
+            <div id="password-error" class="hidden p-3 bg-danger-dim border border-danger rounded-lg text-danger text-sm text-center"></div>
+            <div id="password-success" class="hidden p-3 bg-accent-surface border border-accent-dim rounded-lg text-accent text-sm text-center"></div>
+            <button type="submit" class="w-full p-3 bg-surface border border-border text-text-primary font-medium rounded-lg">Update Password</button>
           </form>
         </div>
-        <div class="settings-actions">
-          <button type="button" class="logout-btn" onclick="app.logout()">Logout</button>
-          <button type="button" onclick="app.closeSettings()">Close</button>
+        <div class="flex gap-3 pt-4 border-t border-border">
+          <button type="button" class="flex-1 p-3 bg-danger text-white font-semibold rounded-lg" onclick="app.logout()">Logout</button>
+          <button type="button" class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg" onclick="app.closeSettings()">Close</button>
         </div>
       </div>
     </div>
