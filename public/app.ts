@@ -1247,6 +1247,7 @@ class GymTrackerApp {
 
     const darkThemeOptions = {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         title: {
