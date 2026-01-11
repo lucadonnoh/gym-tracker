@@ -38,41 +38,35 @@ test.describe('Screen Loading', () => {
   });
 
   test('should scroll to top when navigating to a new screen', async ({ page }) => {
+    // Use mobile viewport to ensure page is scrollable
+    await page.setViewportSize({ width: 375, height: 667 });
+
     // Wait for home content to load
     await page.waitForSelector('#home-content:not(.loading)', { timeout: 5000 });
 
-    // Check if page is scrollable (document taller than viewport)
-    const isScrollable = await page.evaluate(() => {
-      return document.documentElement.scrollHeight > window.innerHeight;
-    });
+    // Try to scroll down on home page
+    await page.evaluate(() => window.scrollTo(0, 500));
+    await page.waitForTimeout(100);
+    const scrollBefore = await page.evaluate(() => window.scrollY);
+    console.log('Scroll position before navigation:', scrollBefore);
 
-    if (isScrollable) {
-      // Scroll down on home page
-      await page.evaluate(() => window.scrollTo(0, 500));
-      await page.waitForTimeout(100);
-      const scrollBefore = await page.evaluate(() => window.scrollY);
-      console.log('Scroll position before navigation:', scrollBefore);
-      // Only assert if we actually scrolled (page was tall enough)
-      if (scrollBefore > 0) {
-        // Navigate to History
-        await page.locator('#home-screen button:has-text("History")').click();
-        await expect(page.locator('#history-screen')).toHaveClass(/active/, { timeout: 2000 });
-
-        // Wait for content to fully load and any async operations to complete
-        await page.waitForTimeout(500);
-
-        // Check scroll position is reset to top
-        const scrollAfter = await page.evaluate(() => window.scrollY);
-        console.log('Scroll position after navigation:', scrollAfter);
-        expect(scrollAfter).toBe(0);
-        return;
-      }
-    }
-
-    // If page wasn't scrollable, just verify navigation works
-    console.log('Page not scrollable, skipping scroll assertion');
+    // Navigate to History
     await page.locator('#home-screen button:has-text("History")').click();
     await expect(page.locator('#history-screen')).toHaveClass(/active/, { timeout: 2000 });
+
+    // Wait for content to fully load and any async operations to complete
+    await page.waitForTimeout(500);
+
+    // Check scroll position is reset to top
+    const scrollAfter = await page.evaluate(() => window.scrollY);
+    console.log('Scroll position after navigation:', scrollAfter);
+
+    // Only assert scroll reset if we actually scrolled before navigation
+    if (scrollBefore > 0) {
+      expect(scrollAfter).toBe(0);
+    } else {
+      console.log('Page did not scroll, skipping scroll-reset assertion');
+    }
   });
 
   test('History screen should load content and not show loading forever', async ({ page }) => {
