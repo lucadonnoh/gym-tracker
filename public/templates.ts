@@ -16,12 +16,14 @@ export function renderDayButton(day: WorkoutDay): string {
   if (day.last_session_date) {
     const lastDate = new Date(day.last_session_date);
     const now = new Date();
-    const diffTime = now.getTime() - lastDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    // Compare calendar dates, not elapsed time
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const lastDay = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
+    const diffDays = Math.round((today.getTime() - lastDay.getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays === 0) {
       daysAgoText = 'today';
     } else if (diffDays === 1) {
-      daysAgoText = '1 day ago';
+      daysAgoText = 'yesterday';
     } else {
       daysAgoText = `${diffDays} days ago`;
     }
@@ -38,14 +40,26 @@ export function renderHistoryItem(session: Session): string {
   const started = new Date(session.started_at);
   const ended = session.ended_at ? new Date(session.ended_at) : null;
   const duration = ended ? formatDuration(ended.getTime() - started.getTime()) : 'In progress';
-  const prBadge = session.pr_count && session.pr_count > 0
-    ? `<span class="px-2 py-0.5 bg-gold text-black text-xs font-semibold rounded ml-2">${session.pr_count} PR${session.pr_count > 1 ? 's' : ''}</span>`
-    : '';
+
+  // Build PR badges by type
+  const prBadges: string[] = [];
+  const s = (n: number) => n > 1 ? 's' : '';
+  if (session.volume_prs && session.volume_prs > 0)
+    prBadges.push(`<span class="px-1.5 py-0.5 bg-gold text-black text-[0.625rem] font-semibold rounded">${session.volume_prs} Vol PR${s(session.volume_prs)}</span>`);
+  if (session.set_prs && session.set_prs > 0)
+    prBadges.push(`<span class="px-1.5 py-0.5 bg-orange-500 text-black text-[0.625rem] font-semibold rounded">${session.set_prs} Set PR${s(session.set_prs)}</span>`);
+  if (session.weight_prs && session.weight_prs > 0)
+    prBadges.push(`<span class="px-1.5 py-0.5 bg-pink-500 text-black text-[0.625rem] font-semibold rounded">${session.weight_prs} 1RM${s(session.weight_prs)}</span>`);
+  if (session.reps_prs && session.reps_prs > 0)
+    prBadges.push(`<span class="px-1.5 py-0.5 bg-purple-500 text-black text-[0.625rem] font-semibold rounded">${session.reps_prs} Reps PR${s(session.reps_prs)}</span>`);
 
   return `
     <div class="bg-surface border border-border rounded-lg p-4 mb-2 cursor-pointer active:bg-surface-elevated" onclick="app.showSessionDetail(${session.id})">
-      <div class="font-semibold text-[0.9375rem] mb-0.5">${started.toLocaleDateString()}</div>
-      <div class="text-text-secondary text-sm flex items-center gap-1">${session.day_display_name}${prBadge}</div>
+      <div class="flex items-center justify-between mb-0.5">
+        <span class="font-semibold text-[0.9375rem]">${started.toLocaleDateString()}</span>
+        ${prBadges.length > 0 ? `<div class="flex gap-1">${prBadges.join('')}</div>` : ''}
+      </div>
+      <div class="text-text-secondary text-sm">${session.day_display_name}</div>
       <div class="text-[0.8125rem] text-text-muted mt-1">${duration}</div>
     </div>
   `;
@@ -334,7 +348,7 @@ export function renderSummaryStats(stats: SummaryStats): string {
     const isToday = new Date().getDay() === jsDay;
     const bgClass = isCompleted ? 'bg-accent text-black' : 'bg-surface text-text-muted';
     const borderClass = isToday ? 'ring-2 ring-accent ring-offset-1 ring-offset-black' : '';
-    return `<div class="w-8 h-8 flex items-center justify-center rounded-full text-xs font-medium ${bgClass} ${borderClass}">${label}</div>`;
+    return `<div class="w-8 h-8 flex items-center justify-center rounded text-xs font-medium ${bgClass} ${borderClass}">${label}</div>`;
   }).join('');
 
   return `

@@ -181,44 +181,60 @@ function migrateSettingsTable(): void {
   }
 }
 
-// Add pr_count column to sessions table if it doesn't exist, and backfill existing sessions
+// Add PR columns to sessions table and backfill existing sessions
 function migrateSessionsPrCount(): void {
   const sessionsInfo = db.prepare("PRAGMA table_info(sessions)").all() as { name: string }[];
-  if (sessionsInfo.length > 0 && !sessionsInfo.some(col => col.name === 'pr_count')) {
+  const columns = sessionsInfo.map(col => col.name);
+
+  // Add pr_count if missing
+  if (!columns.includes('pr_count')) {
     console.log('Adding pr_count column to sessions table...');
     try {
       db.exec('ALTER TABLE sessions ADD COLUMN pr_count INTEGER DEFAULT 0');
-      // Backfill will happen below
     } catch (e) {
       console.error('Failed to add pr_count column:', e);
-      return;
     }
   }
 
-  // Backfill pr_count for completed sessions that have never had pr_count calculated
-  // Only processes sessions with NULL pr_count (not 0, which is a valid calculated value)
+  // Add PR breakdown columns if missing
+  const prColumns = ['volume_prs', 'set_prs', 'weight_prs', 'reps_prs'];
+  for (const col of prColumns) {
+    if (!columns.includes(col)) {
+      console.log(`Adding ${col} column to sessions table...`);
+      try {
+        db.exec(`ALTER TABLE sessions ADD COLUMN ${col} INTEGER DEFAULT 0`);
+      } catch (e) {
+        console.error(`Failed to add ${col} column:`, e);
+      }
+    }
+  }
+
+  // Backfill PR counts for all completed sessions
   const sessionsToBackfill = db.prepare(`
-    SELECT id, user_id FROM sessions
-    WHERE ended_at IS NOT NULL AND pr_count IS NULL
+    SELECT id, user_id FROM sessions WHERE ended_at IS NOT NULL
   `).all() as { id: number; user_id: number }[];
 
   if (sessionsToBackfill.length > 0) {
-    console.log(`Backfilling pr_count for ${sessionsToBackfill.length} sessions...`);
-    const updateStmt = db.prepare('UPDATE sessions SET pr_count = ? WHERE id = ?');
+    console.log(`Backfilling PR counts for ${sessionsToBackfill.length} sessions...`);
+    const updateStmt = db.prepare(`
+      UPDATE sessions SET pr_count = ?, volume_prs = ?, set_prs = ?, weight_prs = ?, reps_prs = ?
+      WHERE id = ?
+    `);
 
     for (const session of sessionsToBackfill) {
       try {
         const stats = getSessionStats(session.id, session.user_id);
-        const prCount = stats.reduce((count, ex) => {
-          return count +
-            (ex.prs.volume ? 1 : 0) +
-            (ex.prs.setVolume ? 1 : 0) +
-            (ex.prs.weight ? 1 : 0) +
-            (ex.prs.reps ? 1 : 0);
-        }, 0);
-        updateStmt.run(prCount, session.id);
+        let volumePrs = 0, setPrs = 0, weightPrs = 0, repsPrs = 0;
+        for (const ex of stats) {
+          if (ex.prs.volume) volumePrs++;
+          if (ex.prs.setVolume) setPrs++;
+          if (ex.prs.weight) weightPrs++;
+          if (ex.prs.reps) repsPrs++;
+        }
+        const prCount = volumePrs + setPrs + weightPrs + repsPrs;
+        updateStmt.run(prCount, volumePrs, setPrs, weightPrs, repsPrs, session.id);
       } catch (e) {
-        console.error(`Failed to backfill pr_count for session ${session.id}:`, e);
+        console.error(`Failed to backfill PR counts for session ${session.id}:`, e);
       }
     }
     console.log('Backfill complete.');
@@ -384,34 +400,40 @@ export function endSession(id: number, userId: number, notes?: string): Session 
   const session = getSessionById(id, userId);
   if (!session) return undefined;
 
-  // Calculate PR count before ending the session
+  // Calculate PR counts by type before ending the session
   const stats = getSessionStats(id, userId);
-  const prCount = stats.reduce((count, ex) => {
-    return count +
-      (ex.prs.volume ? 1 : 0) +
-      (ex.prs.setVolume ? 1 : 0) +
-      (ex.prs.weight ? 1 : 0) +
-      (ex.prs.reps ? 1 : 0);
-  }, 0);
+  let volumePrs = 0, setPrs = 0, weightPrs = 0, repsPrs = 0;
+  for (const ex of stats) {
+    if (ex.prs.volume) volumePrs++;
+    if (ex.prs.setVolume) setPrs++;
+    if (ex.prs.weight) weightPrs++;
+    if (ex.prs.reps) repsPrs++;
+  }
+  const prCount = volumePrs + setPrs + weightPrs + repsPrs;
 
-  db.prepare('UPDATE sessions SET ended_at = ?, notes = ?, pr_count = ? WHERE id = ?').run(
-    new Date().toISOString(),
-    notes || null,
-    prCount,
-    id
-  );
+  db.prepare(`
+    UPDATE sessions SET ended_at = ?, notes = ?, pr_count = ?, volume_prs = ?, set_prs = ?, weight_prs = ?, reps_prs = ?
+    WHERE id = ?
+  `).run(new Date().toISOString(), notes || null, prCount, volumePrs, setPrs, weightPrs, repsPrs, id);
   return getSessionById(id, userId);
 }
 
-export function getAllSessions(userId: number): (SessionWithDay & { pr_count: number })[] {
-  // pr_count is now stored in the sessions table when session ends
+type SessionWithPRs = SessionWithDay & {
+  pr_count: number;
+  volume_prs: number;
+  set_prs: number;
+  weight_prs: number;
+  reps_prs: number;
+};
+
+export function getAllSessions(userId: number): SessionWithPRs[] {
   return db.prepare(`
     SELECT s.*, d.name as day_name, d.display_name as day_display_name
     FROM sessions s
     JOIN workout_days d ON s.day_id = d.id
     WHERE s.user_id = ?
     ORDER BY s.started_at DESC
-  `).all(userId) as (SessionWithDay & { pr_count: number })[];
+  `).all(userId) as SessionWithPRs[];
 }
 
 export function getActiveSession(userId: number): SessionWithDay | undefined {

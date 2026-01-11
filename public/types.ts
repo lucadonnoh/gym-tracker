@@ -44,6 +44,10 @@ export interface Session {
   day_name?: string;
   day_display_name?: string;
   pr_count?: number;
+  volume_prs?: number;
+  set_prs?: number;
+  weight_prs?: number;
+  reps_prs?: number;
 }
 
 export interface ProgressData {
