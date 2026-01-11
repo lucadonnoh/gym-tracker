@@ -186,6 +186,7 @@ class GymTrackerApp {
     // Check authentication first
     if (!api.isAuthenticated()) {
       this.showLoginScreen();
+      document.body.classList.remove('js-loading');
       return;
     }
 
@@ -194,6 +195,7 @@ class GymTrackerApp {
       this.currentUser = await api.getMe();
     } catch {
       this.showLoginScreen();
+      document.body.classList.remove('js-loading');
       return;
     }
 
@@ -224,6 +226,7 @@ class GymTrackerApp {
 
     // Show home screen and handle initial route
     this.$loginScreen?.classList.remove('active');
+    document.body.classList.remove('js-loading');
     await this.handleRoute(window.location.pathname, true);
   }
 

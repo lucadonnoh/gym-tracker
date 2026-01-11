@@ -42,6 +42,11 @@ body {
   visibility: hidden;
 }
 
+/* Hide all content until JS determines auth state */
+body.js-loading #app {
+  visibility: hidden;
+}
+
 /* ============================================
    Screen Management
    ============================================ */
