@@ -39,7 +39,7 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow-y: scroll;
+    overflow-y: auto;
     overscroll-behavior: none;
   }
 
@@ -47,7 +47,7 @@
     font-family: var(--font-sans);
     background: var(--color-black);
     color: var(--color-text-primary);
-    min-height: 100vh;
+    min-height: 100dvh;
     line-height: 1.5;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: none;
@@ -63,7 +63,7 @@
   /* Screen management - JS toggles .active */
   .screen {
     display: none;
-    min-height: 100vh;
+    min-height: 100dvh;
     flex-direction: column;
     background: var(--color-black);
   }

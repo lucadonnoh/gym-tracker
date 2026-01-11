@@ -38,8 +38,8 @@ test.describe('Screen Loading', () => {
   });
 
   test('should scroll to top when navigating to a new screen', async ({ page }) => {
-    // Use mobile viewport to ensure page is scrollable
-    await page.setViewportSize({ width: 375, height: 667 });
+    // Use mobile viewport (iPhone X size)
+    await page.setViewportSize({ width: 375, height: 812 });
 
     // Wait for home content to load
     await page.waitForSelector('#home-content:not(.loading)', { timeout: 5000 });
@@ -48,24 +48,20 @@ test.describe('Screen Loading', () => {
     await page.evaluate(() => window.scrollTo(0, 500));
     await page.waitForTimeout(100);
     const scrollBefore = await page.evaluate(() => window.scrollY);
-    console.log('Scroll position before navigation:', scrollBefore);
 
     // Navigate to History
     await page.locator('#home-screen button:has-text("History")').click();
     await expect(page.locator('#history-screen')).toHaveClass(/active/, { timeout: 2000 });
 
-    // Wait for content to fully load and any async operations to complete
+    // Wait for content to fully load
     await page.waitForTimeout(500);
 
     // Check scroll position is reset to top
     const scrollAfter = await page.evaluate(() => window.scrollY);
-    console.log('Scroll position after navigation:', scrollAfter);
 
-    // Only assert scroll reset if we actually scrolled before navigation
+    // Only assert scroll reset if page was scrollable
     if (scrollBefore > 0) {
       expect(scrollAfter).toBe(0);
-    } else {
-      console.log('Page did not scroll, skipping scroll-reset assertion');
     }
   });
 
