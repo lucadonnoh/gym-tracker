@@ -1016,46 +1016,60 @@ export function setWeeklyGoal(userId: number, goal: number): void {
   setSetting(userId, 'weekly_goal', goal.toString());
 }
 
+// Get Monday of a given week (weeks start on Monday)
+function getMondayOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 // Calculate streak of completed weeks
+// Uses Monday dates as week identifiers to avoid format mismatches between
+// SQLite's strftime('%Y-%W') and JavaScript's ISO week numbers
 export function getWeekStreak(userId: number): { current: number; best: number } {
   const weeklyGoal = getWeeklyGoal(userId);
 
+  // Group workouts by the Monday of each week to avoid week number format issues
   const weeks = db.prepare(`
     SELECT
-      strftime('%Y-%W', started_at) as week,
+      DATE(started_at, '-' || ((CAST(strftime('%w', started_at) AS INTEGER) + 6) % 7) || ' days') as week_monday,
       COUNT(DISTINCT DATE(started_at)) as workout_days
     FROM sessions
     WHERE user_id = ? AND ended_at IS NOT NULL
-    GROUP BY strftime('%Y-%W', started_at)
-    ORDER BY week DESC
-  `).all(userId) as { week: string; workout_days: number }[];
+    GROUP BY DATE(started_at, '-' || ((CAST(strftime('%w', started_at) AS INTEGER) + 6) % 7) || ' days')
+    ORDER BY week_monday DESC
+  `).all(userId) as { week_monday: string; workout_days: number }[];
 
   if (weeks.length === 0) {
     return { current: 0, best: 0 };
   }
 
   const now = new Date();
-  const currentWeek = `${now.getFullYear()}-${String(getWeekNumber(now)).padStart(2, '0')}`;
+  const currentMonday = getMondayOfWeek(now);
+  const currentMondayStr = currentMonday.toISOString().split('T')[0];
 
   let currentStreak = 0;
   let bestStreak = 0;
   let tempStreak = 0;
   let checkingCurrent = true;
 
-  const weekMap = new Map(weeks.map(w => [w.week, w.workout_days]));
+  const weekMap = new Map(weeks.map(w => [w.week_monday, w.workout_days]));
 
-  let checkDate = new Date(now);
+  const checkMonday = new Date(currentMonday);
 
-  const currentWeekWorkouts = weekMap.get(currentWeek) || 0;
+  const currentWeekWorkouts = weekMap.get(currentMondayStr) || 0;
   const currentWeekComplete = currentWeekWorkouts >= weeklyGoal;
 
   if (!currentWeekComplete) {
-    checkDate.setDate(checkDate.getDate() - 7);
+    checkMonday.setDate(checkMonday.getDate() - 7);
   }
 
   for (let i = 0; i < 52; i++) {
-    const weekId = `${checkDate.getFullYear()}-${String(getWeekNumber(checkDate)).padStart(2, '0')}`;
-    const workouts = weekMap.get(weekId) || 0;
+    const mondayStr = checkMonday.toISOString().split('T')[0];
+    const workouts = weekMap.get(mondayStr) || 0;
 
     if (workouts >= weeklyGoal) {
       if (checkingCurrent) {
@@ -1072,7 +1086,7 @@ export function getWeekStreak(userId: number): { current: number; best: number }
       tempStreak = 0;
     }
 
-    checkDate.setDate(checkDate.getDate() - 7);
+    checkMonday.setDate(checkMonday.getDate() - 7);
   }
 
   if (tempStreak > bestStreak) {
@@ -1080,14 +1094,6 @@ export function getWeekStreak(userId: number): { current: number; best: number }
   }
 
   return { current: currentStreak, best: Math.max(bestStreak, currentStreak) };
-}
-
-function getWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
 // Get complete summary stats
