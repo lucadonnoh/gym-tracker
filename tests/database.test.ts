@@ -385,4 +385,176 @@ describe('Database', () => {
       expect(afterSettings.length).toBe(beforeSettings.length);
     });
   });
+
+  describe('Week Streak Calculation', () => {
+    beforeEach(() => {
+      const temp = createTempDb();
+      db = temp.db;
+      dbPath = temp.path;
+      initializeDatabase(db);
+
+      // Create a test user
+      const passwordHash = bcrypt.hashSync('1234', BCRYPT_ROUNDS);
+      db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('testuser', passwordHash);
+
+      // Create a workout day
+      db.prepare("INSERT INTO workout_days (user_id, name, display_name) VALUES (1, 'day1', 'Test Day')").run();
+    });
+
+    // Match SQLite's strftime('%W') behavior
+    function getWeekNumber(date: Date): number {
+      const year = date.getFullYear();
+      const jan1 = new Date(year, 0, 1);
+      const jan1Day = jan1.getDay();
+
+      const startOfYear = new Date(year, 0, 0);
+      const diff = date.getTime() - startOfYear.getTime();
+      const oneDay = 1000 * 60 * 60 * 24;
+      const dayOfYear = Math.floor(diff / oneDay);
+
+      const daysUntilFirstMonday = jan1Day === 0 ? 1 : (jan1Day === 1 ? 0 : 8 - jan1Day);
+
+      if (dayOfYear <= daysUntilFirstMonday) {
+        return 0;
+      }
+
+      return Math.floor((dayOfYear - daysUntilFirstMonday - 1) / 7) + 1;
+    }
+
+    function getWeekStreak(userId: number, weeklyGoal: number): { current: number; best: number } {
+      const weeks = db.prepare(`
+        SELECT
+          strftime('%Y-%W', started_at) as week,
+          COUNT(DISTINCT DATE(started_at)) as workout_days
+        FROM sessions
+        WHERE user_id = ? AND ended_at IS NOT NULL
+        GROUP BY strftime('%Y-%W', started_at)
+        ORDER BY week DESC
+      `).all(userId) as { week: string; workout_days: number }[];
+
+      if (weeks.length === 0) {
+        return { current: 0, best: 0 };
+      }
+
+      const now = new Date();
+      const currentWeek = `${now.getFullYear()}-${String(getWeekNumber(now)).padStart(2, '0')}`;
+
+      let currentStreak = 0;
+      let bestStreak = 0;
+      let tempStreak = 0;
+      let checkingCurrent = true;
+
+      const weekMap = new Map(weeks.map(w => [w.week, w.workout_days]));
+
+      let checkDate = new Date(now);
+
+      const currentWeekWorkouts = weekMap.get(currentWeek) || 0;
+      const currentWeekComplete = currentWeekWorkouts >= weeklyGoal;
+
+      if (!currentWeekComplete) {
+        checkDate.setDate(checkDate.getDate() - 7);
+      }
+
+      for (let i = 0; i < 52; i++) {
+        const weekId = `${checkDate.getFullYear()}-${String(getWeekNumber(checkDate)).padStart(2, '0')}`;
+        const workouts = weekMap.get(weekId) || 0;
+
+        if (workouts >= weeklyGoal) {
+          if (checkingCurrent) {
+            currentStreak++;
+          }
+          tempStreak++;
+        } else {
+          if (checkingCurrent) {
+            checkingCurrent = false;
+          }
+          if (tempStreak > bestStreak) {
+            bestStreak = tempStreak;
+          }
+          tempStreak = 0;
+        }
+
+        checkDate.setDate(checkDate.getDate() - 7);
+      }
+
+      if (tempStreak > bestStreak) {
+        bestStreak = tempStreak;
+      }
+
+      return { current: currentStreak, best: Math.max(bestStreak, currentStreak) };
+    }
+
+    function createSession(userId: number, dayId: number, startedAt: Date): void {
+      const endedAt = new Date(startedAt.getTime() + 60 * 60 * 1000); // 1 hour later
+      db.prepare(`
+        INSERT INTO sessions (user_id, day_id, started_at, ended_at)
+        VALUES (?, ?, ?, ?)
+      `).run(userId, dayId, startedAt.toISOString(), endedAt.toISOString());
+    }
+
+    it('should return 1 week streak when last week is complete but current week is not', () => {
+      const now = new Date();
+      const weeklyGoal = 3;
+
+      // Create 3 sessions last week (complete)
+      for (let i = 0; i < 3; i++) {
+        const lastWeek = new Date(now);
+        lastWeek.setDate(now.getDate() - 7 - i); // Different days last week
+        createSession(1, 1, lastWeek);
+      }
+
+      // Create 1 session this week (incomplete - less than goal of 3)
+      createSession(1, 1, now);
+
+      const streak = getWeekStreak(1, weeklyGoal);
+
+      // Debug: log the weeks found
+      const weeks = db.prepare(`
+        SELECT
+          strftime('%Y-%W', started_at) as week,
+          COUNT(DISTINCT DATE(started_at)) as workout_days
+        FROM sessions
+        WHERE user_id = 1 AND ended_at IS NOT NULL
+        GROUP BY strftime('%Y-%W', started_at)
+        ORDER BY week DESC
+      `).all();
+      console.log('Weeks found:', weeks);
+      console.log('Current week (ISO):', `${now.getFullYear()}-${String(getWeekNumber(now)).padStart(2, '0')}`);
+
+      expect(streak.current).toBe(1); // Last week was complete
+      expect(streak.best).toBe(1);
+    });
+
+    it('should return 0 streak when no weeks are complete', () => {
+      const now = new Date();
+      const weeklyGoal = 3;
+
+      // Create only 1 session this week (incomplete)
+      createSession(1, 1, now);
+
+      const streak = getWeekStreak(1, weeklyGoal);
+
+      expect(streak.current).toBe(0);
+      expect(streak.best).toBe(0);
+    });
+
+    it('should return correct streak for multiple consecutive complete weeks', () => {
+      const now = new Date();
+      const weeklyGoal = 3;
+
+      // Create 3 sessions each for the past 3 weeks
+      for (let week = 1; week <= 3; week++) {
+        for (let day = 0; day < 3; day++) {
+          const date = new Date(now);
+          date.setDate(now.getDate() - (week * 7) + day);
+          createSession(1, 1, date);
+        }
+      }
+
+      const streak = getWeekStreak(1, weeklyGoal);
+
+      expect(streak.current).toBe(3);
+      expect(streak.best).toBe(3);
+    });
+  });
 });

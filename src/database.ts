@@ -1166,12 +1166,30 @@ export function getWeekStreak(userId: number): { current: number; best: number }
   return { current: currentStreak, best: Math.max(bestStreak, currentStreak) };
 }
 
+// Match SQLite's strftime('%W') behavior:
+// Week 00 contains Jan 1 through first Saturday
+// Week 01 starts on first Monday of year
 function getWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  const year = date.getFullYear();
+  const jan1 = new Date(year, 0, 1);
+  const jan1Day = jan1.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+  // Calculate day of year (0-indexed)
+  const startOfYear = new Date(year, 0, 0);
+  const diff = date.getTime() - startOfYear.getTime();
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay); // 1-indexed
+
+  // SQLite %W: Monday is first day of week
+  // Days before first Monday are week 00
+  // daysUntilFirstMonday: if Jan 1 is Monday=0, Tuesday=6, Wednesday=5, etc.
+  const daysUntilFirstMonday = jan1Day === 0 ? 1 : (jan1Day === 1 ? 0 : 8 - jan1Day);
+
+  if (dayOfYear <= daysUntilFirstMonday) {
+    return 0;
+  }
+
+  return Math.floor((dayOfYear - daysUntilFirstMonday - 1) / 7) + 1;
 }
 
 // Get complete summary stats
