@@ -34,6 +34,8 @@ import {
   getExerciseHistory,
   getAllExercises,
   deleteSession,
+  updateSessionEndTime,
+  autoStopStaleSessions,
   updateSetLog,
   deleteSetLog,
   getLastSessionVolume,
@@ -280,6 +282,23 @@ app.put('/api/sessions/:id/end', authMiddleware, (req: AuthRequest, res: Respons
   res.json(session);
 });
 
+app.put('/api/sessions/:id/end-time', authMiddleware, (req: AuthRequest, res: Response) => {
+  const { ended_at } = req.body;
+  if (!ended_at) {
+    return res.status(400).json({ error: 'ended_at is required' });
+  }
+
+  // Validate the date format
+  const date = new Date(ended_at);
+  if (isNaN(date.getTime())) {
+    return res.status(400).json({ error: 'Invalid date format' });
+  }
+
+  const session = updateSessionEndTime(Number(req.params.id), req.user!.id, ended_at);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  res.json(session);
+});
+
 app.delete('/api/sessions/:id', authMiddleware, (req: AuthRequest, res: Response) => {
   const deleted = deleteSession(Number(req.params.id), req.user!.id);
   if (!deleted) return res.status(404).json({ error: 'Session not found' });
@@ -479,4 +498,18 @@ app.get('*', serveIndex);
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Gym Tracker running at http://localhost:${PORT}`);
   console.log(`Access from local network: http://<your-ip>:${PORT}`);
+
+  // Auto-stop stale sessions on startup
+  const stoppedOnStartup = autoStopStaleSessions();
+  if (stoppedOnStartup > 0) {
+    console.log(`Auto-stopped ${stoppedOnStartup} stale session(s) on startup`);
+  }
+
+  // Check for stale sessions every hour
+  setInterval(() => {
+    const stopped = autoStopStaleSessions();
+    if (stopped > 0) {
+      console.log(`Auto-stopped ${stopped} stale session(s)`);
+    }
+  }, 60 * 60 * 1000); // 1 hour
 });

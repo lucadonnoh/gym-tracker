@@ -86,6 +86,32 @@ export function renderSessionSummary(totalVolume: number, exerciseCount: number,
   `;
 }
 
+export function renderSessionTiming(sessionId: number, startedAt: string, endedAt: string | null): string {
+  const started = new Date(startedAt);
+  const ended = endedAt ? new Date(endedAt) : null;
+  const duration = ended ? formatDuration(ended.getTime() - started.getTime()) : 'In progress';
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return `
+    <div class="mb-4 p-3 bg-surface border border-border rounded-lg">
+      <div class="flex items-center justify-between text-sm">
+        <div class="text-text-muted">
+          <span>${formatTime(started)}</span>
+          <span class="mx-2">→</span>
+          <span id="session-end-time">${ended ? formatTime(ended) : '—'}</span>
+          <span class="ml-2 text-text-primary">(${duration})</span>
+        </div>
+        ${ended ? `
+          <button class="text-accent text-xs px-2 py-1 border border-accent rounded" onclick="app.editSessionEndTime(${sessionId}, '${endedAt}')">Edit</button>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
 // Set badge for history (click to edit)
 export function renderSetBadge(setId: number, weight: number, reps: number, exerciseId: number): string {
   return `<span id="set-${setId}" class="inline-block px-2 py-1 bg-black border border-border rounded text-sm cursor-pointer" onclick="app.editSetInline(${setId}, ${exerciseId}, null, ${weight}, ${reps})">${reps} x ${weight}kg</span>`;

@@ -2,5 +2,9 @@
 
 echo "Running tests before push..."
 npm test || exit 1
-npm run test:e2e || exit 1
+
+echo "Seeding test database for e2e tests..."
+DATABASE_PATH=test-e2e.db npm run seed || exit 1
+DATABASE_PATH=test-e2e.db npm run test:e2e || exit 1
+
 echo "All tests passed!"

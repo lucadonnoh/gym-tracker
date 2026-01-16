@@ -1093,6 +1093,50 @@ class GymTrackerApp {
     }
   }
 
+  editSessionEndTime(sessionId: number, currentEndedAt: string): void {
+    const currentDate = new Date(currentEndedAt);
+    const modal = document.getElementById('end-time-modal');
+    const dateInput = document.getElementById('end-time-date') as HTMLInputElement;
+    const timeInput = document.getElementById('end-time-time') as HTMLInputElement;
+    const sessionIdInput = document.getElementById('end-time-session-id') as HTMLInputElement;
+
+    if (!modal || !dateInput || !timeInput || !sessionIdInput) return;
+
+    // Format for input[type="date"] and input[type="time"]
+    dateInput.value = currentDate.toISOString().split('T')[0];
+    timeInput.value = currentDate.toTimeString().slice(0, 5);
+    sessionIdInput.value = sessionId.toString();
+
+    modal.classList.remove('hidden');
+  }
+
+  closeEndTimeModal(): void {
+    document.getElementById('end-time-modal')?.classList.add('hidden');
+  }
+
+  async saveEndTime(event: Event): Promise<void> {
+    event.preventDefault();
+
+    const dateInput = document.getElementById('end-time-date') as HTMLInputElement;
+    const timeInput = document.getElementById('end-time-time') as HTMLInputElement;
+    const sessionIdInput = document.getElementById('end-time-session-id') as HTMLInputElement;
+
+    if (!dateInput.value || !timeInput.value || !sessionIdInput.value) return;
+
+    const sessionId = parseInt(sessionIdInput.value);
+    const newEndTime = new Date(`${dateInput.value}T${timeInput.value}`);
+
+    try {
+      await api.updateSessionEndTime(sessionId, newEndTime.toISOString());
+      this.closeEndTimeModal();
+      // Refresh the session detail
+      await this.showSessionDetail(sessionId);
+    } catch (err) {
+      alert('Failed to update end time');
+      console.error(err);
+    }
+  }
+
   // ===================
   // Inline Set Editing (History View)
   // ===================

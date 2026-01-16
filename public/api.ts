@@ -215,6 +215,10 @@ class Api {
     return this.put(`/api/sessions/${id}/end`, { notes });
   }
 
+  async updateSessionEndTime(id: number, endedAt: string): Promise<Session> {
+    return this.put(`/api/sessions/${id}/end-time`, { ended_at: endedAt });
+  }
+
   async deleteSession(id: number): Promise<boolean> {
     return this.delete(`/api/sessions/${id}`);
   }

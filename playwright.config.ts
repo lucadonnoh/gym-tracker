@@ -12,7 +12,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'PORT=3002 npm start',
+    command: 'DATABASE_PATH=${DATABASE_PATH:-test-e2e.db} PORT=3002 npm start',
     url: 'http://localhost:3002',
     reuseExistingServer: !process.env.CI,
     timeout: 10000,

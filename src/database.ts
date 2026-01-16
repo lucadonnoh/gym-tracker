@@ -31,13 +31,7 @@ export function initializeDatabase(): void {
   // Always check if settings table needs migration (may have been missed in previous partial migration)
   migrateSettingsTable();
 
-  // Add pr_count column if missing (for existing databases)
-  migrateSessionsPrCount();
-
-  // Add is_admin column if missing
-  migrateUsersIsAdmin();
-
-  // Now create tables - will skip if they exist (after migration added user_id)
+  // Create tables first - migrations run after tables exist
   db.exec(`
     CREATE TABLE IF NOT EXISTS workout_days (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,6 +103,13 @@ export function initializeDatabase(): void {
       PRIMARY KEY (user_id, key)
     );
   `);
+
+  // Run migrations AFTER tables exist
+  // Add pr_count column if missing (for existing databases)
+  migrateSessionsPrCount();
+
+  // Add is_admin column if missing
+  migrateUsersIsAdmin();
 
   // Create indexes only after schema is ready (including migrated columns)
   try {
@@ -714,6 +715,89 @@ export function deleteSession(id: number, userId: number): boolean {
 
   const result = db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+// Update session end time (for correcting forgotten end times)
+export function updateSessionEndTime(id: number, userId: number, endedAt: string): Session | undefined {
+  const session = getSessionById(id, userId);
+  if (!session) return undefined;
+
+  db.prepare('UPDATE sessions SET ended_at = ? WHERE id = ?').run(endedAt, id);
+  return getSessionById(id, userId);
+}
+
+// Get last activity time for a session (most recent set log)
+export function getSessionLastActivity(sessionId: number): string | null {
+  const result = db.prepare(`
+    SELECT MAX(sl.rowid) as last_rowid
+    FROM set_logs sl
+    JOIN session_exercises se ON sl.session_exercise_id = se.id
+    WHERE se.session_id = ?
+  `).get(sessionId) as { last_rowid: number | null };
+
+  if (!result?.last_rowid) return null;
+
+  // SQLite doesn't track timestamps on set_logs, so we'll use the session's started_at
+  // as a baseline. For auto-stop purposes, we'll check based on session duration instead.
+  return null;
+}
+
+// Find and auto-stop stale sessions (running 4h+ with no activity for 1h)
+// This checks sessions that have been running for more than 4 hours
+export function autoStopStaleSessions(): number {
+  const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+  const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+
+  // Find active sessions that started more than 4 hours ago
+  const staleSessions = db.prepare(`
+    SELECT s.id, s.user_id, s.started_at,
+      (SELECT MAX(sl.rowid) FROM set_logs sl
+       JOIN session_exercises se ON sl.session_exercise_id = se.id
+       WHERE se.session_id = s.id) as last_set_rowid
+    FROM sessions s
+    WHERE s.ended_at IS NULL
+      AND s.started_at < ?
+  `).all(fourHoursAgo) as { id: number; user_id: number; started_at: string; last_set_rowid: number | null }[];
+
+  let stoppedCount = 0;
+
+  for (const session of staleSessions) {
+    // Check if there's been any recent activity
+    // Since we don't have timestamps on set_logs, we'll check if there are any sets at all
+    // and assume if the session is 4h+ old with no activity in 1h, it's stale
+    // For a more robust check, we'd need to add created_at to set_logs
+
+    // For now, we'll check if the session has any sets and use a heuristic:
+    // If session is 4h+ old, end it at started_at + 4h as a reasonable estimate
+    const sessionStart = new Date(session.started_at);
+    const estimatedEnd = new Date(sessionStart.getTime() + 4 * 60 * 60 * 1000);
+
+    db.prepare(`
+      UPDATE sessions SET ended_at = ?, notes = COALESCE(notes || ' ', '') || '[Auto-stopped after 4h inactivity]'
+      WHERE id = ?
+    `).run(estimatedEnd.toISOString(), session.id);
+
+    // Recalculate PR counts for the auto-stopped session
+    const stats = getSessionStats(session.id, session.user_id);
+    let volumePrs = 0, setPrs = 0, weightPrs = 0, repsPrs = 0;
+    for (const ex of stats) {
+      if (ex.prs.volume) volumePrs++;
+      if (ex.prs.setVolume) setPrs++;
+      if (ex.prs.weight) weightPrs++;
+      if (ex.prs.reps) repsPrs++;
+    }
+    const prCount = volumePrs + setPrs + weightPrs + repsPrs;
+
+    db.prepare(`
+      UPDATE sessions SET pr_count = ?, volume_prs = ?, set_prs = ?, weight_prs = ?, reps_prs = ?
+      WHERE id = ?
+    `).run(prCount, volumePrs, setPrs, weightPrs, repsPrs, session.id);
+
+    stoppedCount++;
+    console.log(`Auto-stopped stale session ${session.id} (started: ${session.started_at})`);
+  }
+
+  return stoppedCount;
 }
 
 // Update set

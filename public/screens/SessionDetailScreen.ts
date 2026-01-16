@@ -61,13 +61,14 @@ export class SessionDetailScreen extends BaseScreen {
     };
     const totalPRs = prCounts.volume + prCounts.setVolume + prCounts.weight + prCounts.reps;
 
+    const timingHtml = templates.renderSessionTiming(session.id, session.started_at, session.ended_at);
     const summaryHtml = templates.renderSessionSummary(totalVolume, exercises.length, totalPRs);
     const exercisesHtml = exercises.map(ex => {
       const exStats = stats.find(s => s.exerciseId === ex.id);
       return templates.renderSessionDetailExercise(ex, exStats);
     }).join('');
 
-    this.$sessionDetailContent.innerHTML = summaryHtml + exercisesHtml;
+    this.$sessionDetailContent.innerHTML = timingHtml + summaryHtml + exercisesHtml;
   }
 
   exit(): void {

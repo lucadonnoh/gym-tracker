@@ -337,6 +337,31 @@
       </div>
     </div>
 
+    <!-- Edit End Time Modal -->
+    <div id="end-time-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2 class="text-xl font-semibold mb-6">Edit End Time</h2>
+        <form id="end-time-form" onsubmit="app.saveEndTime(event)">
+          <input type="hidden" id="end-time-session-id">
+          <label class="block mb-4">
+            <span class="text-[0.9375rem] text-text-primary font-medium">Date</span>
+            <input type="date" id="end-time-date" required
+              class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
+          </label>
+          <label class="block mb-4">
+            <span class="text-[0.9375rem] text-text-primary font-medium">Time</span>
+            <input type="time" id="end-time-time" required
+              class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
+          </label>
+          <div class="flex gap-3 mt-6">
+            <button type="button" onclick="app.closeEndTimeModal()"
+              class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg">Cancel</button>
+            <button type="submit" class="flex-1 p-3 bg-accent text-black font-semibold rounded-lg">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal hidden">
       <div class="modal-content">
