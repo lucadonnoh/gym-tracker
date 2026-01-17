@@ -247,21 +247,19 @@ export function renderSetRow(
   return `
     <div class="flex items-center gap-2 p-3 ${rowBg} border rounded-lg" data-exercise="${exercise.id}" data-set="${expected.setNumber}">
       <span class="text-sm text-text-muted w-12">Set ${expected.setNumber}</span>
-      <input type="number" class="w-14 p-2 bg-black border border-border rounded text-center text-sm ${isLogged ? 'border-accent' : ''}"
+      <input type="number" class="reps-input w-14 p-2 bg-black border border-border rounded text-center text-sm ${isLogged ? 'border-accent' : ''}"
         value="${showReps}"
         inputmode="numeric"
         placeholder="${repsPlaceholder}"
-        onfocus="this.select()"
-        onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] .weight-input').value, this.value)">
+        onfocus="this.select()">
       <span class="text-xs text-text-muted">reps</span>
       <input type="text" class="weight-input w-16 p-2 bg-black border border-border rounded text-center text-sm ${isLogged ? 'border-accent' : ''}"
         value="${showValue}"
         inputmode="decimal"
         placeholder="${placeholderWeight}"
-        onfocus="this.select()"
-        onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber}, this.value, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] input[type=number]').value)">
+        onfocus="this.select()">
       <span class="text-xs text-text-muted">kg</span>
-      ${!isLogged ? `<button class="ml-auto w-10 h-10 bg-accent text-black font-bold rounded-lg" onclick="app.confirmSet(${exercise.id}, ${expected.setNumber}, ${confirmWeight}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${expected.setNumber}\\'] input[type=number]').value || ${confirmReps})">✓</button>` : ''}
+      ${!isLogged ? `<button class="ml-auto w-10 h-10 bg-accent text-black font-bold rounded-lg" onclick="app.confirmSet(${exercise.id}, ${expected.setNumber})">✓</button>` : ''}
     </div>
   `;
 }
@@ -307,16 +305,14 @@ function renderDropsetRow(exercise: ExerciseWithSets, expected: ParsedSet, lastS
               value="${d.logged ? d.reps : ''}"
               inputmode="numeric"
               placeholder="${d.placeholderReps}"
-              onfocus="this.select()"
-              onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber + i * 0.1}, document.getElementById('${setId}-weight-${i}').value, this.value, true)">
+              onfocus="this.select()">
             <span class="text-text-muted">×</span>
             <input type="text" class="w-16 p-2 bg-black border border-border rounded text-center text-sm ${d.logged ? 'border-accent' : ''}"
               id="${setId}-weight-${i}"
               value="${d.logged ? d.weight : ''}"
               inputmode="decimal"
               placeholder="${d.placeholderWeight}"
-              onfocus="this.select()"
-              onchange="app.logSetWeight(${exercise.id}, ${expected.setNumber + i * 0.1}, this.value, document.getElementById('${setId}-reps-${i}').value || ${d.defaultReps}, true)">
+              onfocus="this.select()">
             <span class="text-xs text-text-muted">kg</span>
           </div>
         `).join('')}
@@ -330,20 +326,19 @@ export function renderExtraSetRow(exercise: ExerciseWithSets, logged: SetLog): s
     <div class="flex items-center gap-2 p-3 bg-accent-surface border border-dashed border-accent rounded-lg" data-exercise="${exercise.id}" data-set="${logged.set_number}" data-extra="true">
       <button class="w-6 h-6 text-text-muted text-base hover:text-danger" onclick="app.removeExtraSet(${exercise.id}, ${logged.set_number})">×</button>
       <span class="text-sm text-text-muted w-12">Extra</span>
-      <input type="number" class="w-14 p-2 bg-black border border-accent rounded text-center text-sm"
-        value="${logged.reps || 10}"
+      <input type="number" class="reps-input w-14 p-2 bg-black border border-accent rounded text-center text-sm"
+        value="${logged.reps || ''}"
         inputmode="numeric"
         placeholder="reps"
-        onfocus="this.select()"
-        onchange="app.logSetWeight(${exercise.id}, ${logged.set_number}, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${logged.set_number}\\'] .weight-input').value, this.value)">
+        onfocus="this.select()">
       <span class="text-xs text-text-muted">reps</span>
       <input type="text" class="weight-input w-16 p-2 bg-black border border-accent rounded text-center text-sm"
         value="${logged.weight ?? ''}"
         inputmode="decimal"
         placeholder="kg"
-        onfocus="this.select()"
-        onchange="app.logSetWeight(${exercise.id}, ${logged.set_number}, this.value, document.querySelector('[data-exercise=\\'${exercise.id}\\'][data-set=\\'${logged.set_number}\\'] input[type=number]').value)">
+        onfocus="this.select()">
       <span class="text-xs text-text-muted">kg</span>
+      <button class="ml-auto w-10 h-10 bg-accent text-black font-bold rounded-lg" onclick="app.confirmSet(${exercise.id}, ${logged.set_number})">✓</button>
     </div>
   `;
 }

@@ -546,11 +546,29 @@ class GymTrackerApp {
   // Set Logging
   // ===================
 
-  async confirmSet(exerciseId: number, setNumber: number, defaultWeight: number, reps: number | null): Promise<void> {
-    if (!this.currentSession || defaultWeight === null || defaultWeight === undefined) return;
+  async confirmSet(exerciseId: number, setNumber: number): Promise<void> {
+    if (!this.currentSession) return;
+
+    // Read values from DOM inputs
+    const row = document.querySelector(`[data-exercise="${exerciseId}"][data-set="${setNumber}"]`);
+    if (!row) return;
+
+    const weightInput = row.querySelector('.weight-input') as HTMLInputElement;
+    const repsInput = row.querySelector('.reps-input') as HTMLInputElement;
+
+    const weightStr = weightInput?.value?.replace(',', '.') || weightInput?.placeholder || '';
+    const repsStr = repsInput?.value || repsInput?.placeholder || '';
+
+    const weight = parseFloat(weightStr);
+    const reps = parseInt(repsStr);
+
+    if (isNaN(weight) || weight < 0) {
+      alert('Please enter a valid weight');
+      return;
+    }
 
     try {
-      await api.logSet(this.currentSession.id, exerciseId, setNumber, defaultWeight, reps);
+      await api.logSet(this.currentSession.id, exerciseId, setNumber, weight, isNaN(reps) ? null : reps);
       await api.markExerciseComplete(this.currentSession.id, exerciseId);
       await this.loadSessionExercises();
     } catch (err) {
@@ -637,17 +655,15 @@ class GymTrackerApp {
     newRow.innerHTML = `
       <button class="w-6 h-6 text-text-muted text-base hover:text-danger" onclick="app.removeExtraSet(${exerciseId}, ${newSetNum})">×</button>
       <span class="text-sm text-text-muted w-12">Extra</span>
-      <input type="number" class="w-14 p-2 bg-black border border-border rounded text-center text-sm"
+      <input type="number" class="reps-input w-14 p-2 bg-black border border-border rounded text-center text-sm"
         value="" inputmode="numeric" placeholder="10"
-        onfocus="this.select()"
-        onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, document.querySelector('[data-exercise=\\'${exerciseId}\\'][data-set=\\'${newSetNum}\\'] .weight-input').value, this.value)">
+        onfocus="this.select()">
       <span class="text-xs text-text-muted">reps</span>
       <input type="text" class="weight-input w-16 p-2 bg-black border border-border rounded text-center text-sm"
         value="" inputmode="decimal" placeholder="${defaultWeight || 'kg'}"
-        onfocus="this.select()"
-        onchange="app.logSetWeight(${exerciseId}, ${newSetNum}, this.value, document.querySelector('[data-exercise=\\'${exerciseId}\\'][data-set=\\'${newSetNum}\\'] input[type=number]').value)">
+        onfocus="this.select()">
       <span class="text-xs text-text-muted">kg</span>
-      <button class="ml-auto w-10 h-10 bg-accent text-black font-bold rounded-lg" onclick="app.confirmSet(${exerciseId}, ${newSetNum}, ${defaultWeight || 0}, 10)">✓</button>
+      <button class="ml-auto w-10 h-10 bg-accent text-black font-bold rounded-lg" onclick="app.confirmSet(${exerciseId}, ${newSetNum})">✓</button>
     `;
     setsList.appendChild(newRow);
   }
