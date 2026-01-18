@@ -260,6 +260,10 @@ export function renderSetRow(
 
   const rowBg = isLogged ? 'bg-accent-surface border-accent' : 'bg-surface border-border';
 
+  const buttonClass = isLogged
+    ? 'ml-auto w-10 h-10 bg-surface border border-accent text-accent font-bold rounded-lg'
+    : 'ml-auto w-10 h-10 bg-accent text-black font-bold rounded-lg';
+
   return `
     <div class="flex items-center gap-2 p-3 ${rowBg} border rounded-lg" data-exercise="${exercise.id}" data-set="${expected.setNumber}">
       <span class="text-sm text-text-muted w-12">Set ${expected.setNumber}</span>
@@ -275,7 +279,7 @@ export function renderSetRow(
         placeholder="${placeholderWeight}"
         onfocus="this.select()">
       <span class="text-xs text-text-muted">kg</span>
-      ${!isLogged ? `<button class="ml-auto w-10 h-10 bg-accent text-black font-bold rounded-lg" onclick="app.confirmSet(${exercise.id}, ${expected.setNumber})">✓</button>` : ''}
+      <button class="${buttonClass}" onclick="app.confirmSet(${exercise.id}, ${expected.setNumber})">✓</button>
     </div>
   `;
 }
@@ -306,12 +310,15 @@ function renderDropsetRow(exercise: ExerciseWithSets, expected: ParsedSet, lastS
   const allDropsetLogged = dropsetData.every(d => d.logged);
   const setId = `dropset-${exercise.id}-${expected.setNumber}`;
   const rowBg = allDropsetLogged ? 'bg-accent-surface border-accent' : 'bg-surface border-border';
+  const buttonClass = allDropsetLogged
+    ? 'w-10 h-10 bg-surface border border-accent text-accent font-bold rounded-lg'
+    : 'w-10 h-10 bg-accent text-black font-bold rounded-lg';
 
   return `
     <div class="p-3 ${rowBg} border rounded-lg" data-exercise="${exercise.id}" data-set="${expected.setNumber}">
       <div class="flex items-center justify-between mb-2">
         <span class="text-sm text-text-muted">Set ${expected.setNumber}</span>
-        ${!allDropsetLogged ? `<button class="w-10 h-10 bg-accent text-black font-bold rounded-lg" onclick="app.confirmDropset(${exercise.id}, ${expected.setNumber}, '${setId}', ${expected.dropsetParts})">✓</button>` : ''}
+        <button class="${buttonClass}" onclick="app.confirmDropset(${exercise.id}, ${expected.setNumber}, '${setId}', ${expected.dropsetParts})">✓</button>
       </div>
       <div class="flex flex-col gap-2">
         ${dropsetData.map((d, i) => `
