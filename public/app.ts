@@ -456,6 +456,29 @@ class GymTrackerApp {
     }
   }
 
+  private async refreshExerciseCard(exerciseId: number): Promise<void> {
+    if (!this.currentSession) return;
+
+    // Fetch updated exercise data
+    const exercises = await api.getSessionExercises(this.currentSession.id);
+    const exercise = exercises.find(e => e.id === exerciseId);
+    if (!exercise) return;
+
+    // Update local cache
+    const index = this.currentExercises.findIndex(e => e.id === exerciseId);
+    if (index !== -1) {
+      // Preserve lastVolume from cache
+      exercise.lastVolume = this.currentExercises[index].lastVolume;
+      this.currentExercises[index] = exercise;
+    }
+
+    // Re-render only this exercise card
+    const cardElement = document.getElementById(`exercise-${exerciseId}`);
+    if (cardElement) {
+      cardElement.outerHTML = this.renderExerciseCard(exercise);
+    }
+  }
+
   private renderExerciseCard(exercise: ExerciseWithSets): string {
     const loggedSets = exercise.sets || [];
     const expectedSets = this.parseSetScheme(exercise.description);
@@ -580,7 +603,7 @@ class GymTrackerApp {
     try {
       await api.logSet(this.currentSession.id, exerciseId, setNumber, weight, isNaN(reps) ? null : reps);
       await api.markExerciseComplete(this.currentSession.id, exerciseId);
-      await this.loadSessionExercises();
+      await this.refreshExerciseCard(exerciseId);
     } catch (err) {
       console.error('Failed to save set', err);
     }
@@ -604,7 +627,7 @@ class GymTrackerApp {
       }
 
       await api.markExerciseComplete(this.currentSession.id, exerciseId);
-      await this.loadSessionExercises();
+      await this.refreshExerciseCard(exerciseId);
     } catch (err) {
       console.error('Failed to save dropset', err);
     }
@@ -630,7 +653,7 @@ class GymTrackerApp {
       const card = document.getElementById(`exercise-${exerciseId}`);
       if (card) card.classList.add('completed');
 
-      await this.loadSessionExercises();
+      await this.refreshExerciseCard(exerciseId);
     } catch (err) {
       console.error('Failed to save set', err);
     }
