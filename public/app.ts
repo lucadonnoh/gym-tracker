@@ -4,10 +4,8 @@ import { api } from './api.js';
 import * as templates from './templates.js';
 import type {
   WorkoutDay,
-  Exercise,
   Session,
   ExerciseWithSets,
-  ExerciseStats,
   ParsedSet,
   SetGroup,
   MeasurementFieldConfig,
@@ -509,10 +507,12 @@ class GymTrackerApp {
     const parts = description.split(',').map(p => p.trim());
 
     for (const part of parts) {
-      const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)/i);
+      // Match patterns like "2x10", "1xmax", or "1x20+max+max"
+      const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)((?:\+max)*)/i);
       if (match) {
         const count = parseInt(match[1]);
         const repsStr = match[2].toLowerCase();
+        const maxSuffix = match[3] || ''; // e.g., "+max+max"
 
         if (repsStr === 'max') {
           for (let i = 0; i < count; i++) {
@@ -528,6 +528,14 @@ class GymTrackerApp {
           const reps = parseInt(repsStr);
           for (let i = 0; i < count; i++) {
             sets.push({ setNumber: setNumber++, reps, isDropset: false });
+          }
+        }
+
+        // Handle +max suffix (e.g., "1x20+max+max" adds 2 max sets after the main set)
+        if (maxSuffix) {
+          const maxCount = (maxSuffix.match(/\+max/gi) || []).length;
+          for (let i = 0; i < maxCount; i++) {
+            sets.push({ setNumber: setNumber++, reps: 'max', isDropset: false });
           }
         }
       }
@@ -1673,25 +1681,38 @@ class GymTrackerApp {
     const parts = description.split(',').map(p => p.trim());
 
     for (const part of parts) {
-      const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)/i);
+      // Match patterns like "2x10", "1xmax", or "1x20+max+max"
+      const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)((?:\+max)*)/i);
       if (match) {
         const count = parseInt(match[1]);
         const repsStr = match[2].toLowerCase();
+        const maxSuffix = match[3] || '';
 
+        let group: SetGroup;
         if (repsStr === 'max') {
-          groups.push({ count, reps: 'max', isDropset: false });
+          group = { count, reps: 'max', isDropset: false };
         } else if (repsStr.includes('-')) {
           const dropCount = repsStr.split('-').length;
           const reps = parseInt(repsStr.split('-')[0]);
-          groups.push({ count, reps, isDropset: true, dropsetCount: dropCount });
+          group = { count, reps, isDropset: true, dropsetCount: dropCount };
         } else {
-          groups.push({ count, reps: parseInt(repsStr), isDropset: false });
+          group = { count, reps: parseInt(repsStr), isDropset: false };
+        }
+
+        // Handle +max suffix
+        if (maxSuffix) {
+          const maxCount = (maxSuffix.match(/\+max/gi) || []).length;
+          if (maxCount > 0) {
+            group.maxCount = maxCount;
+          }
         }
 
         const noteMatch = part.match(/\(([^)]+)\)/);
-        if (noteMatch && groups.length > 0) {
-          groups[groups.length - 1].note = noteMatch[1];
+        if (noteMatch) {
+          group.note = noteMatch[1];
         }
+
+        groups.push(group);
       }
     }
 
@@ -1724,6 +1745,13 @@ class GymTrackerApp {
           <input type="number" class="dropset-count" value="${group.dropsetCount || 3}" min="2" max="5"
             placeholder="drops"
             onchange="app.updateSetGroup(${index}, 'dropsetCount', this.value)">
+        ` : ''}
+        ${group.reps !== 'max' ? `
+          <label class="max-suffix-toggle">
+            <span class="text-xs text-text-muted">+max</span>
+            <input type="number" class="max-count" value="${group.maxCount || 0}" min="0" max="5"
+              onchange="app.updateSetGroup(${index}, 'maxCount', this.value)">
+          </label>
         ` : ''}
         <button type="button" class="remove-set-group" onclick="app.removeSetGroup(${index})">×</button>
       </div>
@@ -1764,6 +1792,9 @@ class GymTrackerApp {
       case 'dropsetCount':
         group.dropsetCount = parseInt(value) || 3;
         break;
+      case 'maxCount':
+        group.maxCount = parseInt(value) || 0;
+        break;
     }
 
     this.renderSetGroups();
@@ -1788,6 +1819,12 @@ class GymTrackerApp {
       }
 
       let part = `${group.count}x${repsStr}`;
+
+      // Add +max suffix if specified
+      if (group.maxCount && group.maxCount > 0) {
+        part += '+max'.repeat(group.maxCount);
+      }
+
       if (group.note) part += ` (${group.note})`;
       return part;
     }).join(', ');

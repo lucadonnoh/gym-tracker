@@ -116,7 +116,8 @@
 
   .set-count,
   .set-reps,
-  .dropset-count {
+  .dropset-count,
+  .max-count {
     width: 3.5rem;
     padding: 0.5rem;
     background: var(--color-black);
@@ -127,9 +128,14 @@
     font-size: 0.875rem;
   }
 
+  .max-count {
+    width: 2.5rem;
+  }
+
   .set-count:focus,
   .set-reps:focus,
-  .dropset-count:focus {
+  .dropset-count:focus,
+  .max-count:focus {
     outline: none;
     border-color: var(--color-accent);
   }
@@ -154,7 +160,8 @@
     border-color: var(--color-accent);
   }
 
-  .dropset-toggle {
+  .dropset-toggle,
+  .max-suffix-toggle {
     display: flex;
     align-items: center;
     gap: 0.25rem;

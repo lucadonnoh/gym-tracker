@@ -68,6 +68,7 @@ export interface SetGroup {
   reps: number | 'max';
   isDropset: boolean;
   dropsetCount?: number;
+  maxCount?: number; // Number of +max sets to add after the main set(s)
   note?: string;
 }
 
