@@ -4,13 +4,17 @@ import { api } from '../api.js';
 import type { Friend, FriendRequest, User } from '../types.js';
 
 /**
- * Friends screen - manage friends and friend requests.
+ * Profile screen - user profile, friends, and account settings.
  */
-export class FriendsScreen extends BaseScreen {
-  readonly id = 'friends-screen';
-  readonly route = '/friends';
+export class ProfileScreen extends BaseScreen {
+  readonly id = 'profile-screen';
+  readonly route = '/profile';
 
   private searchTimeout: number | null = null;
+
+  private get $profileUsername() {
+    return document.getElementById('profile-username');
+  }
 
   private get $friendSearchInput() {
     return document.getElementById('friend-search-input') as HTMLInputElement;
@@ -37,6 +41,12 @@ export class FriendsScreen extends BaseScreen {
   }
 
   async enter(_params: RouteParams): Promise<void> {
+    // Set username
+    const state = this.ctx.getState();
+    if (this.$profileUsername && state.currentUser) {
+      this.$profileUsername.textContent = state.currentUser.username;
+    }
+
     // Clear search
     if (this.$friendSearchInput) {
       this.$friendSearchInput.value = '';

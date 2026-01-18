@@ -47,7 +47,7 @@
     <div id="home-screen" class="screen">
       <header class="bg-black text-text-primary p-4 flex items-center justify-between sticky top-0 z-10 border-b border-border">
         <h1 class="text-lg font-semibold">Gym Tracker</h1>
-        <button class="settings-btn w-9 h-9 flex items-center justify-center bg-transparent border border-border text-text-secondary rounded-sm text-lg" onclick="app.showSettings()">⚙</button>
+        <button class="profile-btn w-9 h-9 flex items-center justify-center bg-transparent border border-border text-text-secondary rounded-sm text-lg" onclick="app.showProfile()">👤</button>
       </header>
       <main class="p-4">
         <section id="active-session-banner" class="hidden bg-accent-surface border border-accent rounded-lg p-4 mb-4 flex items-center justify-between">
@@ -60,11 +60,10 @@
             <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Start Workout</h2>
             <div id="day-buttons" class="bg-surface border border-border rounded-lg overflow-hidden"></div>
           </section>
-          <nav class="grid grid-cols-5 gap-2 mt-6 pt-4 border-t border-border">
+          <nav class="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-border">
             <button onclick="app.showHistory()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">History</button>
             <button onclick="app.showProgress()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Progress</button>
             <button onclick="app.showMeasurements()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Body</button>
-            <button onclick="app.showFriends()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Friends</button>
             <button onclick="app.showManage()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Manage</button>
           </nav>
         </div>
@@ -173,34 +172,60 @@
       </main>
     </div>
 
-    <!-- Friends Screen -->
-    <div id="friends-screen" class="screen">
+    <!-- Profile Screen -->
+    <div id="profile-screen" class="screen">
       <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
         <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
-        <h1 class="flex-1 text-lg font-semibold">Friends</h1>
+        <h1 class="flex-1 text-lg font-semibold">Profile</h1>
       </header>
       <main class="p-4">
-        <!-- Add Friend Section -->
+        <!-- User Info -->
         <section class="mb-6">
-          <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Add Friend</h2>
-          <div class="flex gap-2">
-            <input type="text" id="friend-search-input" placeholder="Search by username..."
-              class="flex-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent"
-              oninput="app.searchFriends()">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 bg-surface border border-border rounded-full flex items-center justify-center text-2xl">👤</div>
+            <div>
+              <div id="profile-username" class="text-lg font-semibold text-text-primary"></div>
+              <div class="text-sm text-text-muted">Member</div>
+            </div>
           </div>
-          <div id="friend-search-results" class="mt-2"></div>
         </section>
 
-        <!-- Pending Requests Section -->
-        <section id="pending-requests-section" class="mb-6 hidden">
-          <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Pending Requests</h2>
-          <div id="pending-requests" class="bg-surface border border-border rounded-lg overflow-hidden"></div>
-        </section>
-
-        <!-- Friends List Section -->
+        <!-- Friends Section -->
         <section class="mb-6">
-          <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Your Friends</h2>
+          <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Friends</h2>
+
+          <!-- Add Friend -->
+          <div class="mb-4">
+            <div class="flex gap-2">
+              <input type="text" id="friend-search-input" placeholder="Search by username..."
+                class="flex-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent"
+                oninput="app.searchFriends()">
+            </div>
+            <div id="friend-search-results" class="mt-2"></div>
+          </div>
+
+          <!-- Pending Requests -->
+          <div id="pending-requests-section" class="mb-4 hidden">
+            <div class="text-sm text-text-muted mb-2">Pending Requests</div>
+            <div id="pending-requests" class="bg-surface border border-border rounded-lg overflow-hidden"></div>
+          </div>
+
+          <!-- Friends List -->
           <div id="friends-list" class="bg-surface border border-border rounded-lg overflow-hidden"></div>
+        </section>
+
+        <!-- Account Section -->
+        <section class="mb-6">
+          <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Account</h2>
+          <div class="bg-surface border border-border rounded-lg overflow-hidden">
+            <button onclick="app.showChangePassword()" class="w-full px-4 py-3 text-left flex justify-between items-center border-b border-border active:bg-surface-elevated">
+              <span class="text-text-primary">Change Password</span>
+              <span class="text-text-muted">›</span>
+            </button>
+            <button onclick="app.logout()" class="w-full px-4 py-3 text-left text-danger active:bg-surface-elevated">
+              Logout
+            </button>
+          </div>
         </section>
       </main>
     </div>
@@ -429,41 +454,34 @@
       </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal hidden">
+    <!-- Change Password Modal -->
+    <div id="password-modal" class="modal hidden">
       <div class="modal-content">
-        <h2 class="text-xl font-semibold mb-6">Settings</h2>
-        <div class="flex justify-between items-center py-3 border-b border-border mb-4">
-          <span class="text-text-muted">Logged in as:</span>
-          <span id="settings-username" class="text-text-primary font-medium"></span>
-        </div>
-        <div class="mb-6">
-          <h3 class="text-base font-medium text-text-primary mb-4">Change Password</h3>
-          <form id="password-form" onsubmit="app.changePassword(event)" class="flex flex-col gap-4">
-            <label class="flex flex-col gap-1">
-              <span class="text-sm text-text-secondary">Current Password</span>
-              <input type="password" id="current-password" required autocomplete="current-password"
-                class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
-            </label>
-            <label class="flex flex-col gap-1">
-              <span class="text-sm text-text-secondary">New Password</span>
-              <input type="password" id="new-password" required autocomplete="new-password"
-                class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
-            </label>
-            <label class="flex flex-col gap-1">
-              <span class="text-sm text-text-secondary">Confirm New Password</span>
-              <input type="password" id="confirm-password" required autocomplete="new-password"
-                class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
-            </label>
-            <div id="password-error" class="hidden p-3 bg-danger-dim border border-danger rounded-lg text-danger text-sm text-center"></div>
-            <div id="password-success" class="hidden p-3 bg-accent-surface border border-accent-dim rounded-lg text-accent text-sm text-center"></div>
-            <button type="submit" class="w-full p-3 bg-surface border border-border text-text-primary font-medium rounded-lg">Update Password</button>
-          </form>
-        </div>
-        <div class="flex gap-3 pt-4 border-t border-border">
-          <button type="button" class="flex-1 p-3 bg-danger text-white font-semibold rounded-lg" onclick="app.logout()">Logout</button>
-          <button type="button" class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg" onclick="app.closeSettings()">Close</button>
-        </div>
+        <h2 class="text-xl font-semibold mb-6">Change Password</h2>
+        <form id="password-form" onsubmit="app.changePassword(event)" class="flex flex-col gap-4">
+          <label class="flex flex-col gap-1">
+            <span class="text-sm text-text-secondary">Current Password</span>
+            <input type="password" id="current-password" required autocomplete="current-password"
+              class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-sm text-text-secondary">New Password</span>
+            <input type="password" id="new-password" required autocomplete="new-password"
+              class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-sm text-text-secondary">Confirm New Password</span>
+            <input type="password" id="confirm-password" required autocomplete="new-password"
+              class="w-full p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
+          </label>
+          <div id="password-error" class="hidden p-3 bg-danger-dim border border-danger rounded-lg text-danger text-sm text-center"></div>
+          <div id="password-success" class="hidden p-3 bg-accent-surface border border-accent-dim rounded-lg text-accent text-sm text-center"></div>
+          <div class="flex gap-3 mt-2">
+            <button type="button" onclick="app.closeModal()"
+              class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg">Cancel</button>
+            <button type="submit" class="flex-1 p-3 bg-accent text-black font-semibold rounded-lg">Update</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

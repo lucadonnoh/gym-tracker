@@ -27,7 +27,7 @@ import { HomeScreen } from './screens/HomeScreen.js';
 import { SessionScreen } from './screens/SessionScreen.js';
 import { ManageDayScreen } from './screens/ManageDayScreen.js';
 import { ProgressDayScreen } from './screens/ProgressDayScreen.js';
-import { FriendsScreen } from './screens/FriendsScreen.js';
+import { ProfileScreen } from './screens/ProfileScreen.js';
 import type { ScreenContext, RouteParams, AppState } from './screens/types.js';
 
 class GymTrackerApp {
@@ -54,7 +54,7 @@ class GymTrackerApp {
     'manage-screen': '/manage',
     'manage-day-screen': '/manage/:id',
     'progress-day-screen': '/progress/:id',
-    'friends-screen': '/friends'
+    'profile-screen': '/profile'
   };
 
   // Timers
@@ -78,7 +78,6 @@ class GymTrackerApp {
   private get $restTimerModal() { return document.getElementById('rest-timer-modal'); }
   private get $measurementModal() { return document.getElementById('measurement-modal'); }
   private get $measurementFormFields() { return document.getElementById('measurement-form-fields'); }
-  private get $settingsModal() { return document.getElementById('settings-modal'); }
   private get $exerciseHistoryModal() { return document.getElementById('exercise-history-modal'); }
   private get $exerciseHistoryTitle() { return document.getElementById('exercise-history-title'); }
   private get $exerciseHistoryList() { return document.getElementById('exercise-history-list'); }
@@ -142,7 +141,7 @@ class GymTrackerApp {
     this.screenManager.register(new MeasurementDetailScreen(ctx));
     this.screenManager.register(new HomeScreen(ctx));
     this.screenManager.register(new SessionScreen(ctx));
-    this.screenManager.register(new FriendsScreen(ctx));
+    this.screenManager.register(new ProfileScreen(ctx));
   }
 
   /**
@@ -817,8 +816,8 @@ class GymTrackerApp {
         }
         break;
 
-      case 'friends':
-        await this.showFriends();
+      case 'profile':
+        await this.showProfile();
         break;
 
       default:
@@ -998,28 +997,7 @@ class GymTrackerApp {
     this.currentUser = null;
     this.currentSession = null;
     this.days = [];
-    this.closeSettings();
     this.showLoginScreen();
-  }
-
-  showSettings(): void {
-    const usernameEl = document.getElementById('settings-username');
-    if (usernameEl && this.currentUser) {
-      usernameEl.textContent = this.currentUser.username;
-    }
-
-    // Clear form
-    (document.getElementById('current-password') as HTMLInputElement).value = '';
-    (document.getElementById('new-password') as HTMLInputElement).value = '';
-    (document.getElementById('confirm-password') as HTMLInputElement).value = '';
-    document.getElementById('password-error')?.classList.add('hidden');
-    document.getElementById('password-success')?.classList.add('hidden');
-
-    this.$settingsModal?.classList.remove('hidden');
-  }
-
-  closeSettings(): void {
-    this.$settingsModal?.classList.add('hidden');
   }
 
   async changePassword(event: Event): Promise<void> {
@@ -1061,15 +1039,9 @@ class GymTrackerApp {
         return;
       }
 
-      // Success
-      (document.getElementById('current-password') as HTMLInputElement).value = '';
-      (document.getElementById('new-password') as HTMLInputElement).value = '';
-      (document.getElementById('confirm-password') as HTMLInputElement).value = '';
-
-      if (successDiv) {
-        successDiv.textContent = 'Password updated successfully';
-        successDiv.classList.remove('hidden');
-      }
+      // Success - close modal
+      this.closeModal();
+      alert('Password updated successfully');
     } catch (err) {
       if (errorDiv) {
         errorDiv.textContent = 'Failed to change password';
@@ -1538,40 +1510,51 @@ class GymTrackerApp {
   }
 
   // ===================
-  // Friends
+  // Profile
   // ===================
 
-  async showFriends(): Promise<void> {
-    await this.screenManager.navigateTo('friends-screen');
+  async showProfile(): Promise<void> {
+    await this.screenManager.navigateTo('profile-screen');
   }
 
-  private getFriendsScreen(): FriendsScreen | null {
-    return this.screenManager.get('friends-screen') as FriendsScreen | null;
+  private getProfileScreen(): ProfileScreen | null {
+    return this.screenManager.get('profile-screen') as ProfileScreen | null;
   }
 
   async searchFriends(): Promise<void> {
-    const screen = this.getFriendsScreen();
+    const screen = this.getProfileScreen();
     await screen?.searchFriends();
   }
 
   async sendFriendRequest(userId: number): Promise<void> {
-    const screen = this.getFriendsScreen();
+    const screen = this.getProfileScreen();
     await screen?.sendFriendRequest(userId);
   }
 
   async acceptFriendRequest(requestId: number): Promise<void> {
-    const screen = this.getFriendsScreen();
+    const screen = this.getProfileScreen();
     await screen?.acceptFriendRequest(requestId);
   }
 
   async rejectFriendRequest(requestId: number): Promise<void> {
-    const screen = this.getFriendsScreen();
+    const screen = this.getProfileScreen();
     await screen?.rejectFriendRequest(requestId);
   }
 
   async removeFriend(friendId: number): Promise<void> {
-    const screen = this.getFriendsScreen();
+    const screen = this.getProfileScreen();
     await screen?.removeFriend(friendId);
+  }
+
+  showChangePassword(): void {
+    // Clear form
+    (document.getElementById('current-password') as HTMLInputElement).value = '';
+    (document.getElementById('new-password') as HTMLInputElement).value = '';
+    (document.getElementById('confirm-password') as HTMLInputElement).value = '';
+    document.getElementById('password-error')?.classList.add('hidden');
+    document.getElementById('password-success')?.classList.add('hidden');
+
+    document.getElementById('password-modal')?.classList.remove('hidden');
   }
 
   // ===================
