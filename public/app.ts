@@ -1725,35 +1725,43 @@ class GymTrackerApp {
 
     container.innerHTML = this.setGroups.map((group, index) => `
       <div class="set-group" data-index="${index}">
-        <input type="number" class="set-count" value="${group.count}" min="1" max="10"
-          onchange="app.updateSetGroup(${index}, 'count', this.value)">
-        <span class="set-group-label">x</span>
-        <select class="set-reps-type" onchange="app.updateSetGroup(${index}, 'repsType', this.value)">
-          <option value="number" ${group.reps !== 'max' ? 'selected' : ''}>Reps</option>
-          <option value="max" ${group.reps === 'max' ? 'selected' : ''}>Max</option>
-        </select>
-        ${group.reps !== 'max' ? `
-          <input type="number" class="set-reps" value="${group.reps}" min="1" max="100"
-            onchange="app.updateSetGroup(${index}, 'reps', this.value)">
-        ` : ''}
-        <label class="dropset-toggle">
-          <input type="checkbox" ${group.isDropset ? 'checked' : ''}
-            onchange="app.updateSetGroup(${index}, 'isDropset', this.checked)">
-          Drop
-        </label>
-        ${group.isDropset ? `
-          <input type="number" class="dropset-count" value="${group.dropsetCount || 3}" min="2" max="5"
-            placeholder="drops"
-            onchange="app.updateSetGroup(${index}, 'dropsetCount', this.value)">
-        ` : ''}
-        ${group.reps !== 'max' ? `
-          <label class="max-suffix-toggle">
-            <span class="text-xs text-text-muted">+max</span>
-            <input type="number" class="max-count" value="${group.maxCount || 0}" min="0" max="5"
-              onchange="app.updateSetGroup(${index}, 'maxCount', this.value)">
+        <div class="set-group-main">
+          <input type="number" class="set-count" value="${group.count}" min="1" max="10"
+            onchange="app.updateSetGroup(${index}, 'count', this.value)">
+          <span class="set-group-label">sets of</span>
+          ${group.reps === 'max' ? `
+            <span class="set-reps-display">max</span>
+          ` : `
+            <input type="number" class="set-reps" value="${group.reps}" min="1" max="100"
+              onchange="app.updateSetGroup(${index}, 'reps', this.value)">
+            <span class="set-group-label">reps</span>
+          `}
+          <button type="button" class="remove-set-group" onclick="app.removeSetGroup(${index})">×</button>
+        </div>
+        <div class="set-group-options">
+          <label class="set-option">
+            <input type="checkbox" ${group.reps === 'max' ? 'checked' : ''}
+              onchange="app.updateSetGroup(${index}, 'repsType', this.checked ? 'max' : 'number')">
+            <span>Max reps</span>
           </label>
-        ` : ''}
-        <button type="button" class="remove-set-group" onclick="app.removeSetGroup(${index})">×</button>
+          ${group.reps !== 'max' ? `
+            <label class="set-option">
+              <input type="checkbox" ${group.isDropset ? 'checked' : ''}
+                onchange="app.updateSetGroup(${index}, 'isDropset', this.checked)">
+              <span>Dropset</span>
+              ${group.isDropset ? `
+                <input type="number" class="option-input" value="${group.dropsetCount || 3}" min="2" max="5"
+                  onchange="app.updateSetGroup(${index}, 'dropsetCount', this.value)">
+                <span class="option-label">drops</span>
+              ` : ''}
+            </label>
+            <label class="set-option">
+              <span>+max</span>
+              <input type="number" class="option-input" value="${group.maxCount || 0}" min="0" max="5"
+                onchange="app.updateSetGroup(${index}, 'maxCount', this.value)">
+            </label>
+          ` : ''}
+        </div>
       </div>
     `).join('');
 

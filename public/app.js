@@ -318,35 +318,43 @@ Default password: 1234
 
 They should change it after first login.`),e.value="",await this.screenManager.navigateTo("manage-screen")}catch(s){alert(s.message||"Failed to create user")}}showAddDay(){document.getElementById("day-display-name").value="",document.getElementById("day-error")?.classList.add("hidden"),document.getElementById("day-modal")?.classList.remove("hidden")}async saveDay(e){e.preventDefault();let t=document.getElementById("day-display-name"),s=document.getElementById("day-error"),r=t.value.trim();if(!r)return;let n=r.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,""),o=await d.createDay(n,r);if("error"in o){s&&(s.textContent=o.error,s.classList.remove("hidden"));return}this.days=await d.getDays(),this.renderDayButtons(),this.closeModal(),await this.showManageDay(o.id)}showRenameDay(){let t=this.getManageDayScreen()?.getDayId();if(!t)return;let s=this.days.find(r=>r.id===t);s&&(document.getElementById("rename-day-id").value=t.toString(),document.getElementById("rename-day-name").value=s.display_name,document.getElementById("rename-day-modal")?.classList.remove("hidden"))}async renameDay(e){e.preventDefault();let t=parseInt(document.getElementById("rename-day-id").value),s=document.getElementById("rename-day-name").value.trim();if(!t||!s)return;await d.updateDay(t,s),this.days=await d.getDays(),this.renderDayButtons();let r=document.getElementById("manage-day-title");r&&(r.textContent=s),this.closeModal()}async deleteDay(){let t=this.getManageDayScreen()?.getDayId();if(!t)return;let s=this.days.find(r=>r.id===t);s&&confirm(`Delete "${s.display_name}" and all its exercises? This cannot be undone.`)&&(await d.deleteDay(t),this.days=await d.getDays(),this.renderDayButtons(),this.goBack())}async updateFriendRequestBadge(){try{let t=(await d.getPendingFriendRequests()).length;this.$friendRequestBadge&&(t>0?(this.$friendRequestBadge.textContent=t>9?"9+":t.toString(),this.$friendRequestBadge.classList.remove("hidden")):this.$friendRequestBadge.classList.add("hidden"))}catch(e){console.error("Failed to fetch friend request count:",e)}}async showProfile(){await this.screenManager.navigateTo("profile-screen")}getProfileScreen(){return this.screenManager.get("profile-screen")}async searchFriends(){await this.getProfileScreen()?.searchFriends()}async sendFriendRequest(e){await this.getProfileScreen()?.sendFriendRequest(e)}async acceptFriendRequest(e){await this.getProfileScreen()?.acceptFriendRequest(e),this.updateFriendRequestBadge()}async rejectFriendRequest(e){await this.getProfileScreen()?.rejectFriendRequest(e),this.updateFriendRequestBadge()}async removeFriend(e){await this.getProfileScreen()?.removeFriend(e)}showChangePassword(){document.getElementById("current-password").value="",document.getElementById("new-password").value="",document.getElementById("confirm-password").value="",document.getElementById("password-error")?.classList.add("hidden"),document.getElementById("password-success")?.classList.add("hidden"),document.getElementById("password-modal")?.classList.remove("hidden")}showAddExercise(){let t=this.getManageDayScreen()?.getDayId();t&&(document.getElementById("modal-title").textContent="Add Exercise",document.getElementById("exercise-id").value="",document.getElementById("exercise-day-id").value=t.toString(),document.getElementById("exercise-name").value="",document.getElementById("exercise-weight").value="",this.setGroups=[{count:3,reps:10,isDropset:!1}],this.renderSetGroups(),this.$exerciseModal?.classList.remove("hidden"))}async editExercise(e){let t=await d.getExercise(e);document.getElementById("modal-title").textContent="Edit Exercise",document.getElementById("exercise-id").value=e.toString(),document.getElementById("exercise-day-id").value=t.day_id.toString(),document.getElementById("exercise-name").value=t.name,document.getElementById("exercise-weight").value=t.default_weight?.toString()||"",this.setGroups=this.parseDescriptionToGroups(t.description),this.renderSetGroups(),this.$exerciseModal?.classList.remove("hidden")}closeModal(){document.querySelectorAll(".modal").forEach(e=>e.classList.add("hidden"))}async saveExercise(e){e.preventDefault();let t=document.getElementById("exercise-id").value,s=parseInt(document.getElementById("exercise-day-id").value),r=document.getElementById("exercise-name").value,n=this.generateDescription()||null,o=document.getElementById("exercise-weight").value.replace(",","."),a=parseFloat(o)||null;try{t?await d.updateExercise(parseInt(t),r,n,a):await d.createExercise(s,r,n,a),this.closeModal(),await this.loadDayExercises()}catch(c){alert("Failed to save exercise"),console.error(c)}}async deleteExercise(e){if(confirm("Delete this exercise?"))try{await d.deleteExercise(e),await this.loadDayExercises()}catch(t){alert("Failed to delete exercise"),console.error(t)}}parseDescriptionToGroups(e){if(!e)return[{count:3,reps:10,isDropset:!1}];let t=[],s=e.split(",").map(r=>r.trim());for(let r of s){let n=r.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)((?:\+max)*)/i);if(n){let o=parseInt(n[1]),a=n[2].toLowerCase(),c=n[3]||"",l;if(a==="max")l={count:o,reps:"max",isDropset:!1};else if(a.includes("-")){let p=a.split("-").length,u=parseInt(a.split("-")[0]);l={count:o,reps:u,isDropset:!0,dropsetCount:p}}else l={count:o,reps:parseInt(a),isDropset:!1};if(c){let p=(c.match(/\+max/gi)||[]).length;p>0&&(l.maxCount=p)}let m=r.match(/\(([^)]+)\)/);m&&(l.note=m[1]),t.push(l)}}return t.length>0?t:[{count:3,reps:10,isDropset:!1}]}renderSetGroups(){let e=document.getElementById("set-groups");e&&(e.innerHTML=this.setGroups.map((t,s)=>`
       <div class="set-group" data-index="${s}">
-        <input type="number" class="set-count" value="${t.count}" min="1" max="10"
-          onchange="app.updateSetGroup(${s}, 'count', this.value)">
-        <span class="set-group-label">x</span>
-        <select class="set-reps-type" onchange="app.updateSetGroup(${s}, 'repsType', this.value)">
-          <option value="number" ${t.reps!=="max"?"selected":""}>Reps</option>
-          <option value="max" ${t.reps==="max"?"selected":""}>Max</option>
-        </select>
-        ${t.reps!=="max"?`
-          <input type="number" class="set-reps" value="${t.reps}" min="1" max="100"
-            onchange="app.updateSetGroup(${s}, 'reps', this.value)">
-        `:""}
-        <label class="dropset-toggle">
-          <input type="checkbox" ${t.isDropset?"checked":""}
-            onchange="app.updateSetGroup(${s}, 'isDropset', this.checked)">
-          Drop
-        </label>
-        ${t.isDropset?`
-          <input type="number" class="dropset-count" value="${t.dropsetCount||3}" min="2" max="5"
-            placeholder="drops"
-            onchange="app.updateSetGroup(${s}, 'dropsetCount', this.value)">
-        `:""}
-        ${t.reps!=="max"?`
-          <label class="max-suffix-toggle">
-            <span class="text-xs text-text-muted">+max</span>
-            <input type="number" class="max-count" value="${t.maxCount||0}" min="0" max="5"
-              onchange="app.updateSetGroup(${s}, 'maxCount', this.value)">
+        <div class="set-group-main">
+          <input type="number" class="set-count" value="${t.count}" min="1" max="10"
+            onchange="app.updateSetGroup(${s}, 'count', this.value)">
+          <span class="set-group-label">sets of</span>
+          ${t.reps==="max"?`
+            <span class="set-reps-display">max</span>
+          `:`
+            <input type="number" class="set-reps" value="${t.reps}" min="1" max="100"
+              onchange="app.updateSetGroup(${s}, 'reps', this.value)">
+            <span class="set-group-label">reps</span>
+          `}
+          <button type="button" class="remove-set-group" onclick="app.removeSetGroup(${s})">\xD7</button>
+        </div>
+        <div class="set-group-options">
+          <label class="set-option">
+            <input type="checkbox" ${t.reps==="max"?"checked":""}
+              onchange="app.updateSetGroup(${s}, 'repsType', this.checked ? 'max' : 'number')">
+            <span>Max reps</span>
           </label>
-        `:""}
-        <button type="button" class="remove-set-group" onclick="app.removeSetGroup(${s})">\xD7</button>
+          ${t.reps!=="max"?`
+            <label class="set-option">
+              <input type="checkbox" ${t.isDropset?"checked":""}
+                onchange="app.updateSetGroup(${s}, 'isDropset', this.checked)">
+              <span>Dropset</span>
+              ${t.isDropset?`
+                <input type="number" class="option-input" value="${t.dropsetCount||3}" min="2" max="5"
+                  onchange="app.updateSetGroup(${s}, 'dropsetCount', this.value)">
+                <span class="option-label">drops</span>
+              `:""}
+            </label>
+            <label class="set-option">
+              <span>+max</span>
+              <input type="number" class="option-input" value="${t.maxCount||0}" min="0" max="5"
+                onchange="app.updateSetGroup(${s}, 'maxCount', this.value)">
+            </label>
+          `:""}
+        </div>
       </div>
     `).join(""),this.updateDescriptionPreview())}addSetGroup(){this.setGroups.push({count:1,reps:10,isDropset:!1}),this.renderSetGroups()}removeSetGroup(e){this.setGroups.length<=1||(this.setGroups.splice(e,1),this.renderSetGroups())}updateSetGroup(e,t,s){let r=this.setGroups[e];if(r){switch(t){case"count":r.count=parseInt(s)||1;break;case"reps":r.reps=parseInt(s)||10;break;case"repsType":r.reps=s==="max"?"max":10;break;case"isDropset":r.isDropset=s,s&&!r.dropsetCount&&(r.dropsetCount=3);break;case"dropsetCount":r.dropsetCount=parseInt(s)||3;break;case"maxCount":r.maxCount=parseInt(s)||0;break}this.renderSetGroups()}}updateDescriptionPreview(){let e=document.getElementById("description-preview-text");e&&(e.textContent=this.generateDescription()||"No sets defined")}generateDescription(){return this.setGroups.map(e=>{let t;e.reps==="max"?t="max":e.isDropset&&e.dropsetCount?t=Array(e.dropsetCount).fill(e.reps).join("-"):t=e.reps.toString();let s=`${e.count}x${t}`;return e.maxCount&&e.maxCount>0&&(s+="+max".repeat(e.maxCount)),e.note&&(s+=` (${e.note})`),s}).join(", ")}async showExerciseHistory(e,t){if(!(!this.$exerciseHistoryModal||!this.$exerciseHistoryTitle||!this.$exerciseHistoryList)){this.$exerciseHistoryTitle.textContent=t,this.$exerciseHistoryList.innerHTML='<div class="text-center text-text-muted py-4">Loading history...</div>',this.$exerciseHistoryModal.classList.remove("hidden");try{let s=await d.getExerciseHistory(e,5);if(s.length===0){this.$exerciseHistoryList.innerHTML='<div class="text-center text-text-muted py-8">No previous sessions found</div>';return}this.$exerciseHistoryList.innerHTML=s.map(r=>{let o=new Date(r.date).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}),a=r.sets.map(c=>`<span class="inline-block px-2 py-1 bg-black rounded text-sm text-text-primary">${c.reps} \xD7 ${c.weight}kg</span>`).join("");return`
           <div class="bg-surface border border-border rounded-lg p-3 mb-3">

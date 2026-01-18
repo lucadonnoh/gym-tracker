@@ -108,16 +108,29 @@
 
   /* Set group builder in Add Exercise modal */
   .set-group {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 0.75rem;
+  }
+
+  .set-group-main {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .set-group-options {
+    display: flex;
     flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--color-border);
   }
 
   .set-count,
-  .set-reps,
-  .dropset-count,
-  .max-count {
+  .set-reps {
     width: 3.5rem;
     padding: 0.5rem;
     background: var(--color-black);
@@ -128,56 +141,62 @@
     font-size: 0.875rem;
   }
 
-  .max-count {
-    width: 2.5rem;
-  }
-
   .set-count:focus,
-  .set-reps:focus,
-  .dropset-count:focus,
-  .max-count:focus {
+  .set-reps:focus {
     outline: none;
     border-color: var(--color-accent);
   }
 
   .set-group-label {
     color: var(--color-text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .set-reps-display {
+    color: var(--color-accent);
+    font-weight: 600;
     font-size: 0.875rem;
   }
 
-  .set-reps-type {
-    padding: 0.5rem 0.75rem;
-    background: var(--color-black);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    color: var(--color-text-primary);
-    font-size: 0.875rem;
-    cursor: pointer;
-  }
-
-  .set-reps-type:focus {
-    outline: none;
-    border-color: var(--color-accent);
-  }
-
-  .dropset-toggle,
-  .max-suffix-toggle {
+  .set-option {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.375rem;
     color: var(--color-text-secondary);
     font-size: 0.8125rem;
     cursor: pointer;
   }
 
-  .dropset-toggle input[type="checkbox"] {
+  .set-option input[type="checkbox"] {
     width: 1rem;
     height: 1rem;
     accent-color: var(--color-accent);
     cursor: pointer;
   }
 
+  .option-input {
+    width: 2.5rem;
+    padding: 0.25rem;
+    background: var(--color-black);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-primary);
+    text-align: center;
+    font-size: 0.75rem;
+  }
+
+  .option-input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  .option-label {
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+  }
+
   .remove-set-group {
+    margin-left: auto;
     padding: 0.25rem 0.5rem;
     background: transparent;
     border: none;
