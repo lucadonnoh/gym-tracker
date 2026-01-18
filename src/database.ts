@@ -347,6 +347,27 @@ export function createDay(userId: number, name: string, displayName: string): Wo
   return getDayById(Number(result.lastInsertRowid), userId)!;
 }
 
+export function updateDay(id: number, userId: number, displayName: string): WorkoutDay | undefined {
+  const day = getDayById(id, userId);
+  if (!day) return undefined;
+
+  // Also update the name slug
+  const name = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  db.prepare('UPDATE workout_days SET display_name = ?, name = ? WHERE id = ? AND user_id = ?').run(displayName, name, id, userId);
+  return getDayById(id, userId);
+}
+
+export function deleteDay(id: number, userId: number): boolean {
+  const day = getDayById(id, userId);
+  if (!day) return false;
+
+  // Delete all exercises for this day first (cascade)
+  db.prepare('DELETE FROM exercises WHERE day_id = ?').run(id);
+  // Delete the day
+  const result = db.prepare('DELETE FROM workout_days WHERE id = ? AND user_id = ?').run(id, userId);
+  return result.changes > 0;
+}
+
 // Exercises
 export function getExercisesByDay(dayId: number, userId: number): Exercise[] {
   // Verify day belongs to user

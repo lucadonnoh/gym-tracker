@@ -163,6 +163,8 @@
       <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
         <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
         <h1 id="manage-day-title" class="flex-1 text-lg font-semibold truncate">Exercises</h1>
+        <button class="px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.showRenameDay()">Rename</button>
+        <button class="px-3 py-2 bg-transparent border border-danger-dim text-danger rounded-sm text-sm font-medium" onclick="app.deleteDay()">Delete</button>
       </header>
       <main class="p-4">
         <div id="manage-exercise-list"></div>
@@ -256,7 +258,7 @@
       </div>
     </div>
 
-    <!-- Day Modal -->
+    <!-- Day Modal (Add) -->
     <div id="day-modal" class="modal hidden">
       <div class="modal-content">
         <h2 class="text-xl font-semibold mb-6">Add Workout Day</h2>
@@ -267,6 +269,26 @@
               class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
           </label>
           <div id="day-error" class="hidden p-3 bg-danger-dim border border-danger rounded-lg text-danger text-sm text-center mb-4"></div>
+          <div class="flex gap-3 mt-6">
+            <button type="button" onclick="app.closeModal()"
+              class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg">Cancel</button>
+            <button type="submit" class="flex-1 p-3 bg-accent text-black font-semibold rounded-lg">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Rename Day Modal -->
+    <div id="rename-day-modal" class="modal hidden">
+      <div class="modal-content">
+        <h2 class="text-xl font-semibold mb-6">Rename Workout Day</h2>
+        <form id="rename-day-form" onsubmit="app.renameDay(event)">
+          <input type="hidden" id="rename-day-id">
+          <label class="block mb-4">
+            <span class="text-[0.9375rem] text-text-primary font-medium">New Name</span>
+            <input type="text" id="rename-day-name" required placeholder="Display name"
+              class="w-full mt-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent">
+          </label>
           <div class="flex gap-3 mt-6">
             <button type="button" onclick="app.closeModal()"
               class="flex-1 p-3 bg-black border border-border text-text-secondary font-semibold rounded-lg">Cancel</button>

@@ -89,6 +89,15 @@ class Api {
     return this.handleResponse<T>(res);
   }
 
+  private async patch<T>(url: string, body: object): Promise<T> {
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body)
+    });
+    return this.handleResponse<T>(res);
+  }
+
   private async delete(url: string): Promise<boolean> {
     const res = await fetch(url, {
       method: 'DELETE',
@@ -137,6 +146,14 @@ class Api {
 
   async createDay(name: string, displayName: string): Promise<WorkoutDay | { error: string }> {
     return this.post('/api/days', { name, display_name: displayName });
+  }
+
+  async updateDay(id: number, displayName: string): Promise<WorkoutDay> {
+    return this.patch(`/api/days/${id}`, { display_name: displayName });
+  }
+
+  async deleteDay(id: number): Promise<boolean> {
+    return this.delete(`/api/days/${id}`);
   }
 
   async getDayExercises(dayId: number): Promise<Exercise[]> {

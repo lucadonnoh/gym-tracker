@@ -1433,7 +1433,7 @@ class GymTrackerApp {
   }
 
   // ===================
-  // Add Workout Day
+  // Add/Rename/Delete Workout Day
   // ===================
 
   showAddDay(): void {
@@ -1472,6 +1472,62 @@ class GymTrackerApp {
 
     // Navigate to the new day's manage screen
     await this.showManageDay(result.id);
+  }
+
+  showRenameDay(): void {
+    const screen = this.getManageDayScreen();
+    const dayId = screen?.getDayId();
+    if (!dayId) return;
+
+    const day = this.days.find(d => d.id === dayId);
+    if (!day) return;
+
+    (document.getElementById('rename-day-id') as HTMLInputElement).value = dayId.toString();
+    (document.getElementById('rename-day-name') as HTMLInputElement).value = day.display_name;
+    document.getElementById('rename-day-modal')?.classList.remove('hidden');
+  }
+
+  async renameDay(event: Event): Promise<void> {
+    event.preventDefault();
+
+    const dayId = parseInt((document.getElementById('rename-day-id') as HTMLInputElement).value);
+    const displayName = (document.getElementById('rename-day-name') as HTMLInputElement).value.trim();
+
+    if (!dayId || !displayName) return;
+
+    await api.updateDay(dayId, displayName);
+
+    // Refresh days list
+    this.days = await api.getDays();
+    this.renderDayButtons();
+
+    // Update the title in the current screen
+    const titleEl = document.getElementById('manage-day-title');
+    if (titleEl) titleEl.textContent = displayName;
+
+    this.closeModal();
+  }
+
+  async deleteDay(): Promise<void> {
+    const screen = this.getManageDayScreen();
+    const dayId = screen?.getDayId();
+    if (!dayId) return;
+
+    const day = this.days.find(d => d.id === dayId);
+    if (!day) return;
+
+    if (!confirm(`Delete "${day.display_name}" and all its exercises? This cannot be undone.`)) {
+      return;
+    }
+
+    await api.deleteDay(dayId);
+
+    // Refresh days list
+    this.days = await api.getDays();
+    this.renderDayButtons();
+
+    // Go back to manage screen
+    this.goBack();
   }
 
   // ===================

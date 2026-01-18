@@ -16,6 +16,8 @@ import {
   getAllDays,
   getDayById,
   createDay,
+  updateDay,
+  deleteDay,
   getExercisesByDay,
   getExerciseById,
   createExercise,
@@ -195,6 +197,26 @@ app.post('/api/days', authMiddleware, (req: AuthRequest, res: Response) => {
     }
     throw e;
   }
+});
+
+app.patch('/api/days/:id', authMiddleware, (req: AuthRequest, res: Response) => {
+  const { display_name } = req.body;
+  if (!display_name) {
+    return res.status(400).json({ error: 'display_name is required' });
+  }
+  const day = updateDay(Number(req.params.id), req.user!.id, display_name);
+  if (!day) {
+    return res.status(404).json({ error: 'Day not found' });
+  }
+  res.json(day);
+});
+
+app.delete('/api/days/:id', authMiddleware, (req: AuthRequest, res: Response) => {
+  const deleted = deleteDay(Number(req.params.id), req.user!.id);
+  if (!deleted) {
+    return res.status(404).json({ error: 'Day not found' });
+  }
+  res.status(204).send();
 });
 
 // Exercises
