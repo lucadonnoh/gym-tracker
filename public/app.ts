@@ -69,6 +69,7 @@ class GymTrackerApp {
   private get $dayButtons() { return document.getElementById('day-buttons'); }
   private get $activeSessionBanner() { return document.getElementById('active-session-banner'); }
   private get $statsContainer() { return document.getElementById('stats-container'); }
+  private get $friendRequestBadge() { return document.getElementById('friend-request-badge'); }
   private get $weeklyGoalModal() { return document.getElementById('weekly-goal-modal'); }
   private get $weeklyGoalContent() { return document.getElementById('weekly-goal-content'); }
   private get $sessionDayName() { return document.getElementById('session-day-name'); }
@@ -201,6 +202,9 @@ class GymTrackerApp {
     if (this.$statsContainer) {
       this.$statsContainer.innerHTML = templates.renderSummaryStats(stats);
     }
+
+    // Update friend request badge (non-blocking)
+    this.updateFriendRequestBadge();
 
     // Wait for DOM update then reveal content
     await new Promise(resolve => requestAnimationFrame(resolve));
@@ -984,6 +988,9 @@ class GymTrackerApp {
       this.$statsContainer.innerHTML = templates.renderSummaryStats(stats);
     }
 
+    // Update friend request badge (non-blocking)
+    this.updateFriendRequestBadge();
+
     await new Promise(resolve => requestAnimationFrame(resolve));
     document.getElementById('home-content')?.classList.remove('loading');
 
@@ -1513,6 +1520,24 @@ class GymTrackerApp {
   // Profile
   // ===================
 
+  async updateFriendRequestBadge(): Promise<void> {
+    try {
+      const requests = await api.getPendingFriendRequests();
+      const count = requests.length;
+
+      if (this.$friendRequestBadge) {
+        if (count > 0) {
+          this.$friendRequestBadge.textContent = count > 9 ? '9+' : count.toString();
+          this.$friendRequestBadge.classList.remove('hidden');
+        } else {
+          this.$friendRequestBadge.classList.add('hidden');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch friend request count:', err);
+    }
+  }
+
   async showProfile(): Promise<void> {
     await this.screenManager.navigateTo('profile-screen');
   }
@@ -1534,11 +1559,13 @@ class GymTrackerApp {
   async acceptFriendRequest(requestId: number): Promise<void> {
     const screen = this.getProfileScreen();
     await screen?.acceptFriendRequest(requestId);
+    this.updateFriendRequestBadge();
   }
 
   async rejectFriendRequest(requestId: number): Promise<void> {
     const screen = this.getProfileScreen();
     await screen?.rejectFriendRequest(requestId);
+    this.updateFriendRequestBadge();
   }
 
   async removeFriend(friendId: number): Promise<void> {
