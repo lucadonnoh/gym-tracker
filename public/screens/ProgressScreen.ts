@@ -1,24 +1,16 @@
 import { BaseScreen } from './BaseScreen.js';
 import type { RouteParams, ScreenContext } from './types.js';
-import { api } from '../api.js';
-
-// Chart.js is loaded via script tag
-declare const Chart: any;
+import * as templates from '../templates.js';
 
 /**
- * Progress screen - displays exercise progress charts.
- * Has chart cleanup responsibility.
+ * Progress screen - shows list of workout days to view progress.
  */
 export class ProgressScreen extends BaseScreen {
   readonly id = 'progress-screen';
   readonly route = '/progress';
 
-  private get $progressDaySelect() {
-    return document.getElementById('progress-day-select') as HTMLSelectElement | null;
-  }
-
-  private get $progressCharts() {
-    return document.getElementById('progress-charts');
+  private get $progressDayButtons() {
+    return document.getElementById('progress-day-buttons');
   }
 
   constructor(ctx: ScreenContext) {
@@ -26,20 +18,15 @@ export class ProgressScreen extends BaseScreen {
   }
 
   async enter(_params: RouteParams): Promise<void> {
-    // Populate day dropdown from app state
     const state = this.ctx.getState();
 
-    if (this.$progressDaySelect) {
-      this.$progressDaySelect.innerHTML = '<option value="">Select workout day...</option>' +
-        state.days.map(d => `<option value="${d.id}">${d.display_name}</option>`).join('');
-    }
-
-    // Clear charts container (user needs to select a day first)
-    if (this.$progressCharts) {
-      this.$progressCharts.innerHTML = '';
+    // Render day buttons
+    if (this.$progressDayButtons) {
+      if (state.days.length === 0) {
+        this.$progressDayButtons.innerHTML = '<p class="p-4 text-text-muted text-center">No workout days yet</p>';
+      } else {
+        this.$progressDayButtons.innerHTML = state.days.map(d => templates.renderProgressDayButton(d)).join('');
+      }
     }
   }
-
-  // Charts are loaded via loadDayProgress() called from onclick
-  // Cleanup handled by BaseScreen.exit() - charts registered via registerChart()
 }

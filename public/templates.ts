@@ -45,6 +45,15 @@ export function renderManageDayButton(day: WorkoutDay): string {
   `;
 }
 
+export function renderProgressDayButton(day: WorkoutDay): string {
+  return `
+    <button class="w-full px-4 py-3 text-left flex justify-between items-center border-b border-border last:border-b-0 active:bg-surface-elevated" onclick="app.showProgressDay(${day.id})">
+      <span class="font-semibold text-text-primary">${day.display_name}</span>
+      <span class="text-text-muted">›</span>
+    </button>
+  `;
+}
+
 export function renderHistoryItem(session: Session): string {
   const started = new Date(session.started_at);
   const ended = session.ended_at ? new Date(session.ended_at) : null;

@@ -26,9 +26,8 @@ import { MeasurementDetailScreen } from './screens/MeasurementDetailScreen.js';
 import { HomeScreen } from './screens/HomeScreen.js';
 import { SessionScreen } from './screens/SessionScreen.js';
 import { ManageDayScreen } from './screens/ManageDayScreen.js';
+import { ProgressDayScreen } from './screens/ProgressDayScreen.js';
 import type { ScreenContext, RouteParams, AppState } from './screens/types.js';
-
-declare const Chart: any;
 
 class GymTrackerApp {
   // State
@@ -52,16 +51,14 @@ class GymTrackerApp {
     'measurements-screen': '/body',
     'measurement-detail-screen': '/body/:id',
     'manage-screen': '/manage',
-    'manage-day-screen': '/manage/:id'
+    'manage-day-screen': '/manage/:id',
+    'progress-day-screen': '/progress/:id'
   };
 
   // Timers
   private timerInterval: number | null = null;
   private restTimerInterval: number | null = null;
   private restTimeRemaining: number = 0;
-
-  // Charts (array for multiple exercise charts)
-  private progressCharts: any[] = [];
 
   // Screen manager for modular screen components
   private screenManager: ScreenManager;
@@ -75,8 +72,6 @@ class GymTrackerApp {
   private get $sessionDayName() { return document.getElementById('session-day-name'); }
   private get $sessionTimer() { return document.getElementById('session-timer'); }
   private get $exerciseList() { return document.getElementById('exercise-list'); }
-  private get $progressDaySelect() { return document.getElementById('progress-day-select') as HTMLSelectElement; }
-  private get $progressCharts() { return document.getElementById('progress-charts'); }
   private get $exerciseModal() { return document.getElementById('exercise-modal'); }
   private get $restTimerModal() { return document.getElementById('rest-timer-modal'); }
   private get $measurementModal() { return document.getElementById('measurement-modal'); }
@@ -139,6 +134,7 @@ class GymTrackerApp {
     this.screenManager.register(new ManageScreen(ctx));
     this.screenManager.register(new ManageDayScreen(ctx));
     this.screenManager.register(new ProgressScreen(ctx));
+    this.screenManager.register(new ProgressDayScreen(ctx));
     this.screenManager.register(new MeasurementsScreen(ctx));
     this.screenManager.register(new SessionDetailScreen(ctx));
     this.screenManager.register(new MeasurementDetailScreen(ctx));
@@ -787,13 +783,11 @@ class GymTrackerApp {
         break;
 
       case 'progress':
-        if (segments[1]) {
-          // /progress/:exerciseId
-          const exerciseId = parseInt(segments[1]);
-          if (!isNaN(exerciseId)) {
-            await this.showProgressForExercise(exerciseId);
-          }
+        if (segments.length > 1 && segments[1]) {
+          // /progress/:id - progress for day
+          await this.showProgressDay(parseInt(segments[1]));
         } else {
+          // /progress - progress screen (day list)
           await this.showProgress();
         }
         break;
@@ -1228,169 +1222,26 @@ class GymTrackerApp {
     await this.screenManager.navigateTo('progress-screen');
   }
 
+  async showProgressDay(dayId: number): Promise<void> {
+    await this.screenManager.navigateTo('progress-day-screen', { id: dayId.toString() });
+  }
+
+  private getProgressDayScreen(): ProgressDayScreen | null {
+    return this.screenManager.get('progress-day-screen') as ProgressDayScreen | null;
+  }
+
   async showProgressForExercise(exerciseId: number): Promise<void> {
     // Find which day this exercise belongs to
     const exercises = await api.getAllExercises();
     const exercise = exercises.find(e => e.id === exerciseId);
     if (!exercise) return;
 
-    // Navigate to progress screen first
-    await this.screenManager.navigateTo('progress-screen');
-
-    // Then select the day and load charts
-    if (this.$progressDaySelect) {
-      this.$progressDaySelect.value = exercise.day_id.toString();
-      await this.loadDayProgress();
-    }
+    // Navigate to progress day screen
+    await this.showProgressDay(exercise.day_id);
 
     // Scroll to the specific exercise chart after charts are loaded
-    setTimeout(() => {
-      const chartEl = document.getElementById(`progress-exercise-${exerciseId}`);
-      chartEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  }
-
-  // loadProgressDaySelect() moved to ProgressScreen.enter()
-
-  async loadDayProgress(): Promise<void> {
-    if (!this.$progressDaySelect || !this.$progressCharts) return;
-
-    const dayId = this.$progressDaySelect.value;
-    if (!dayId) {
-      this.$progressCharts.innerHTML = '';
-      this.destroyProgressCharts();
-      return;
-    }
-
-    // Get all exercises for this day
-    const exercises = await api.getDayExercises(parseInt(dayId));
-
-    if (exercises.length === 0) {
-      this.$progressCharts.innerHTML = '<p class="text-center text-text-muted py-8">No exercises for this day</p>';
-      return;
-    }
-
-    // Destroy old charts
-    this.destroyProgressCharts();
-
-    // Create container for each exercise
-    this.$progressCharts.innerHTML = exercises.map(ex => `
-      <div class="bg-surface border border-border rounded-lg p-4 mb-4" id="progress-exercise-${ex.id}">
-        <h3 class="font-semibold text-text-primary mb-3">${ex.name}</h3>
-        <div class="progress-charts-container grid gap-4">
-          <div class="h-[150px]"><canvas id="weight-chart-${ex.id}"></canvas></div>
-          <div class="h-[150px]"><canvas id="reps-chart-${ex.id}"></canvas></div>
-        </div>
-      </div>
-    `).join('');
-
-    // Load progress data and render charts for each exercise
-    for (const exercise of exercises) {
-      const data = await api.getProgress(exercise.id);
-      if (data.length > 0) {
-        this.renderExerciseCharts(exercise.id, data);
-      } else {
-        const container = document.getElementById(`progress-exercise-${exercise.id}`);
-        const chartsDiv = container?.querySelector('.progress-charts-container');
-        if (chartsDiv) {
-          chartsDiv.innerHTML = '<p class="text-center text-text-muted py-4">No data yet</p>';
-        }
-      }
-    }
-  }
-
-  private destroyProgressCharts(): void {
-    for (const chart of this.progressCharts) {
-      chart.destroy();
-    }
-    this.progressCharts = [];
-  }
-
-  private renderExerciseCharts(exerciseId: number, data: { date: string; maxWeight: number; totalReps: number }[]): void {
-    const labels = data.map(d => d.date);
-    const weights = data.map(d => d.maxWeight);
-    const reps = data.map(d => d.totalReps);
-
-    const darkThemeOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        title: {
-          display: true,
-          color: '#888888',
-          font: { family: 'Outfit', weight: '500' as const, size: 12 }
-        }
-      },
-      scales: {
-        x: {
-          ticks: { color: '#555555', font: { family: 'Outfit', size: 10 } },
-          grid: { color: '#1a1a1a' }
-        },
-        y: {
-          ticks: { color: '#555555', font: { family: 'Outfit', size: 10 } },
-          grid: { color: '#1a1a1a' }
-        }
-      }
-    };
-
-    const weightCtx = document.getElementById(`weight-chart-${exerciseId}`) as HTMLCanvasElement;
-    if (weightCtx) {
-      const weightChart = new Chart(weightCtx, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            label: 'Max Weight (kg)',
-            data: weights,
-            borderColor: '#22c55e',
-            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-            fill: true,
-            tension: 0.3,
-            pointBackgroundColor: '#22c55e',
-            pointBorderColor: '#22c55e',
-            pointRadius: 3
-          }]
-        },
-        options: {
-          ...darkThemeOptions,
-          plugins: {
-            ...darkThemeOptions.plugins,
-            title: { ...darkThemeOptions.plugins.title, text: 'Weight' }
-          }
-        }
-      });
-      this.progressCharts.push(weightChart);
-    }
-
-    const repsCtx = document.getElementById(`reps-chart-${exerciseId}`) as HTMLCanvasElement;
-    if (repsCtx) {
-      const repsChart = new Chart(repsCtx, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            label: 'Total Reps',
-            data: reps,
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            fill: true,
-            tension: 0.3,
-            pointBackgroundColor: '#3b82f6',
-            pointBorderColor: '#3b82f6',
-            pointRadius: 3
-          }]
-        },
-        options: {
-          ...darkThemeOptions,
-          plugins: {
-            ...darkThemeOptions.plugins,
-            title: { ...darkThemeOptions.plugins.title, text: 'Reps' }
-          }
-        }
-      });
-      this.progressCharts.push(repsChart);
-    }
+    const screen = this.getProgressDayScreen();
+    screen?.scrollToExercise(exerciseId);
   }
 
   // ===================
