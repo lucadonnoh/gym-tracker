@@ -36,6 +36,15 @@ export function renderDayButton(day: WorkoutDay): string {
   `;
 }
 
+export function renderManageDayButton(day: WorkoutDay): string {
+  return `
+    <button class="w-full px-4 py-3 text-left flex justify-between items-center border-b border-border last:border-b-0 active:bg-surface-elevated" onclick="app.showManageDay(${day.id})">
+      <span class="font-semibold text-text-primary">${day.display_name}</span>
+      <span class="text-text-muted">›</span>
+    </button>
+  `;
+}
+
 export function renderHistoryItem(session: Session): string {
   const started = new Date(session.started_at);
   const ended = session.ended_at ? new Date(session.ended_at) : null;
@@ -236,8 +245,6 @@ export function renderSetRow(
   const lastSet = lastSets.find(s => s.set_number === expected.setNumber);
   const placeholderWeight = lastSet?.weight?.toString() || exercise.default_weight?.toString() || 'kg';
   const placeholderReps = lastSet?.reps?.toString() || 'reps';
-  const confirmWeight = lastSet?.weight || exercise.default_weight || 0;
-  const confirmReps = isMax ? (lastSet?.reps || null) : expected.reps;
 
   const showReps = isLogged ? reps : (isMax ? '' : expected.reps);
   const repsPlaceholder = isMax ? placeholderReps : expected.reps;

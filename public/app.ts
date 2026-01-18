@@ -25,6 +25,7 @@ import { SessionDetailScreen } from './screens/SessionDetailScreen.js';
 import { MeasurementDetailScreen } from './screens/MeasurementDetailScreen.js';
 import { HomeScreen } from './screens/HomeScreen.js';
 import { SessionScreen } from './screens/SessionScreen.js';
+import { ManageDayScreen } from './screens/ManageDayScreen.js';
 import type { ScreenContext, RouteParams, AppState } from './screens/types.js';
 
 declare const Chart: any;
@@ -50,7 +51,8 @@ class GymTrackerApp {
     'progress-screen': '/progress',
     'measurements-screen': '/body',
     'measurement-detail-screen': '/body/:id',
-    'manage-screen': '/manage'
+    'manage-screen': '/manage',
+    'manage-day-screen': '/manage/:id'
   };
 
   // Timers
@@ -75,9 +77,6 @@ class GymTrackerApp {
   private get $exerciseList() { return document.getElementById('exercise-list'); }
   private get $progressDaySelect() { return document.getElementById('progress-day-select') as HTMLSelectElement; }
   private get $progressCharts() { return document.getElementById('progress-charts'); }
-  private get $manageDaySelect() { return document.getElementById('manage-day-select') as HTMLSelectElement; }
-  private get $manageExerciseList() { return document.getElementById('manage-exercise-list'); }
-  private get $addExerciseBtn() { return document.getElementById('add-exercise-btn'); }
   private get $exerciseModal() { return document.getElementById('exercise-modal'); }
   private get $restTimerModal() { return document.getElementById('rest-timer-modal'); }
   private get $measurementModal() { return document.getElementById('measurement-modal'); }
@@ -138,6 +137,7 @@ class GymTrackerApp {
     const ctx = this.createScreenContext();
     this.screenManager.register(new HistoryScreen(ctx));
     this.screenManager.register(new ManageScreen(ctx));
+    this.screenManager.register(new ManageDayScreen(ctx));
     this.screenManager.register(new ProgressScreen(ctx));
     this.screenManager.register(new MeasurementsScreen(ctx));
     this.screenManager.register(new SessionDetailScreen(ctx));
@@ -811,7 +811,13 @@ class GymTrackerApp {
         break;
 
       case 'manage':
-        await this.showManage();
+        if (segments.length > 1 && segments[1]) {
+          // /manage/:id - manage day exercises
+          await this.showManageDay(parseInt(segments[1]));
+        } else {
+          // /manage - manage screen (day list)
+          await this.showManage();
+        }
         break;
 
       default:
@@ -1534,25 +1540,19 @@ class GymTrackerApp {
     await this.screenManager.navigateTo('manage-screen');
   }
 
-  // loadManageDaySelect() moved to ManageScreen.enter()
+  async showManageDay(dayId: number): Promise<void> {
+    await this.screenManager.navigateTo('manage-day-screen', { id: dayId.toString() });
+  }
+
+  private getManageDayScreen(): ManageDayScreen | null {
+    return this.screenManager.get('manage-day-screen') as ManageDayScreen | null;
+  }
 
   async loadDayExercises(): Promise<void> {
-    if (!this.$manageDaySelect) return;
-
-    const dayId = this.$manageDaySelect.value;
-    if (!dayId) {
-      if (this.$manageExerciseList) this.$manageExerciseList.innerHTML = '';
-      this.$addExerciseBtn?.classList.add('hidden');
-      return;
+    const screen = this.getManageDayScreen();
+    if (screen) {
+      await screen.loadExercises();
     }
-
-    const exercises = await api.getDayExercises(parseInt(dayId));
-
-    if (this.$manageExerciseList) {
-      this.$manageExerciseList.innerHTML = exercises.map(ex => templates.renderManageExercise(ex)).join('');
-    }
-
-    this.$addExerciseBtn?.classList.remove('hidden');
   }
 
   // ===================
@@ -1617,16 +1617,10 @@ class GymTrackerApp {
     this.days = await api.getDays();
     this.renderDayButtons();
 
-    // Refresh manage day select dropdown
-    if (this.$manageDaySelect) {
-      this.$manageDaySelect.innerHTML = '<option value="">Select workout day...</option>' +
-        this.days.map(d => `<option value="${d.id}">${d.display_name}</option>`).join('');
-      // Select the new day
-      this.$manageDaySelect.value = result.id.toString();
-      await this.loadDayExercises();
-    }
-
     this.closeModal();
+
+    // Navigate to the new day's manage screen
+    await this.showManageDay(result.id);
   }
 
   // ===================
@@ -1634,12 +1628,13 @@ class GymTrackerApp {
   // ===================
 
   showAddExercise(): void {
-    const dayId = this.$manageDaySelect?.value;
+    const screen = this.getManageDayScreen();
+    const dayId = screen?.getDayId();
     if (!dayId) return;
 
     (document.getElementById('modal-title') as HTMLElement).textContent = 'Add Exercise';
     (document.getElementById('exercise-id') as HTMLInputElement).value = '';
-    (document.getElementById('exercise-day-id') as HTMLInputElement).value = dayId;
+    (document.getElementById('exercise-day-id') as HTMLInputElement).value = dayId.toString();
     (document.getElementById('exercise-name') as HTMLInputElement).value = '';
     (document.getElementById('exercise-weight') as HTMLInputElement).value = '';
 

@@ -132,16 +132,9 @@
         <h1 class="flex-1 text-lg font-semibold">Manage</h1>
       </header>
       <main class="p-4">
-        <div class="flex gap-2 mb-4">
-          <select id="manage-day-select" onchange="app.loadDayExercises()"
-            class="flex-1 p-3 bg-surface border border-border rounded-lg text-base text-text-primary">
-            <option value="">Select workout day...</option>
-          </select>
-          <button id="add-day-btn" onclick="app.showAddDay()"
-            class="px-4 py-3 bg-transparent border border-accent text-accent font-medium rounded-lg text-sm whitespace-nowrap">+ Day</button>
-        </div>
-        <div id="manage-exercise-list"></div>
-        <button id="add-exercise-btn" class="hidden w-full p-3 bg-accent text-black font-semibold rounded-lg mt-4" onclick="app.showAddExercise()">+ Add Exercise</button>
+        <div id="manage-day-buttons" class="bg-surface border border-border rounded-lg overflow-hidden mb-4"></div>
+        <button id="add-day-btn" onclick="app.showAddDay()"
+          class="w-full p-3 bg-transparent border border-accent text-accent font-medium rounded-lg text-sm">+ Add Workout Day</button>
 
         <!-- Admin Section (donnoh only) -->
         <div id="admin-section" class="hidden mt-8 pt-6 border-t border-border">
@@ -155,6 +148,18 @@
             <div id="user-list" class="text-sm text-text-secondary"></div>
           </div>
         </div>
+      </main>
+    </div>
+
+    <!-- Manage Day Exercises Screen -->
+    <div id="manage-day-screen" class="screen">
+      <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
+        <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
+        <h1 id="manage-day-title" class="flex-1 text-lg font-semibold truncate">Exercises</h1>
+      </header>
+      <main class="p-4">
+        <div id="manage-exercise-list"></div>
+        <button id="add-exercise-btn" onclick="app.showAddExercise()" class="w-full p-3 bg-accent text-black font-semibold rounded-lg mt-4">+ Add Exercise</button>
       </main>
     </div>
 
