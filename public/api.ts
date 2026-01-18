@@ -10,7 +10,9 @@ import type {
   SetLog,
   BodyMeasurement,
   SummaryStats,
-  User
+  User,
+  FriendRequest,
+  Friend
 } from './types.js';
 
 const TOKEN_KEY = 'gym_tracker_token';
@@ -333,6 +335,39 @@ class Api {
 
   async createUser(username: string): Promise<{ id: number; username: string }> {
     return this.post('/api/admin/users', { username });
+  }
+
+  // Friends
+  async getFriends(): Promise<Friend[]> {
+    return this.get('/api/friends');
+  }
+
+  async getPendingFriendRequests(): Promise<FriendRequest[]> {
+    return this.get('/api/friends/requests/pending');
+  }
+
+  async getSentFriendRequests(): Promise<FriendRequest[]> {
+    return this.get('/api/friends/requests/sent');
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    return this.get(`/api/friends/search?q=${encodeURIComponent(query)}`);
+  }
+
+  async sendFriendRequest(toUserId: number): Promise<FriendRequest | { error: string }> {
+    return this.post('/api/friends/requests', { to_user_id: toUserId });
+  }
+
+  async acceptFriendRequest(requestId: number): Promise<FriendRequest | { error: string }> {
+    return this.put(`/api/friends/requests/${requestId}/accept`);
+  }
+
+  async rejectFriendRequest(requestId: number): Promise<FriendRequest | { error: string }> {
+    return this.put(`/api/friends/requests/${requestId}/reject`);
+  }
+
+  async removeFriend(friendId: number): Promise<boolean> {
+    return this.delete(`/api/friends/${friendId}`);
   }
 }
 

@@ -51,6 +51,14 @@ import {
   getSummaryStats,
   getWeeklyGoal,
   setWeeklyGoal,
+  sendFriendRequest,
+  acceptFriendRequest,
+  rejectFriendRequest,
+  getPendingFriendRequests,
+  getSentFriendRequests,
+  getFriends,
+  removeFriend,
+  searchUsers,
   db
 } from './database.js';
 
@@ -448,6 +456,74 @@ app.put('/api/stats/weekly-goal', authMiddleware, (req: AuthRequest, res: Respon
   }
   setWeeklyGoal(req.user!.id, goal);
   res.json({ goal: getWeeklyGoal(req.user!.id) });
+});
+
+// ===================
+// Friend Endpoints
+// ===================
+
+// Get friends list
+app.get('/api/friends', authMiddleware, (req: AuthRequest, res: Response) => {
+  res.json(getFriends(req.user!.id));
+});
+
+// Get pending friend requests (received)
+app.get('/api/friends/requests/pending', authMiddleware, (req: AuthRequest, res: Response) => {
+  res.json(getPendingFriendRequests(req.user!.id));
+});
+
+// Get sent friend requests
+app.get('/api/friends/requests/sent', authMiddleware, (req: AuthRequest, res: Response) => {
+  res.json(getSentFriendRequests(req.user!.id));
+});
+
+// Search users (for adding friends)
+app.get('/api/friends/search', authMiddleware, (req: AuthRequest, res: Response) => {
+  const query = req.query.q as string;
+  if (!query || query.length < 2) {
+    return res.status(400).json({ error: 'Search query must be at least 2 characters' });
+  }
+  res.json(searchUsers(query, req.user!.id));
+});
+
+// Send friend request
+app.post('/api/friends/requests', authMiddleware, (req: AuthRequest, res: Response) => {
+  const { to_user_id } = req.body;
+  if (!to_user_id) {
+    return res.status(400).json({ error: 'to_user_id is required' });
+  }
+  const result = sendFriendRequest(req.user!.id, to_user_id);
+  if ('error' in result) {
+    return res.status(400).json(result);
+  }
+  res.status(201).json(result);
+});
+
+// Accept friend request
+app.put('/api/friends/requests/:id/accept', authMiddleware, (req: AuthRequest, res: Response) => {
+  const result = acceptFriendRequest(Number(req.params.id), req.user!.id);
+  if ('error' in result) {
+    return res.status(400).json(result);
+  }
+  res.json(result);
+});
+
+// Reject friend request
+app.put('/api/friends/requests/:id/reject', authMiddleware, (req: AuthRequest, res: Response) => {
+  const result = rejectFriendRequest(Number(req.params.id), req.user!.id);
+  if ('error' in result) {
+    return res.status(400).json(result);
+  }
+  res.json(result);
+});
+
+// Remove friend
+app.delete('/api/friends/:id', authMiddleware, (req: AuthRequest, res: Response) => {
+  const removed = removeFriend(req.user!.id, Number(req.params.id));
+  if (!removed) {
+    return res.status(404).json({ error: 'Friend not found' });
+  }
+  res.status(204).send();
 });
 
 // Admin endpoints (requires admin user)

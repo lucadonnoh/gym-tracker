@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import bcrypt from 'bcrypt';
-import type { WorkoutDay, Exercise, Session, SessionExercise, SetLog, SessionWithDay, ExerciseWithSets, BodyMeasurement, User } from './types.js';
+import type { WorkoutDay, Exercise, Session, SessionExercise, SetLog, SessionWithDay, ExerciseWithSets, BodyMeasurement, User, FriendRequest, FriendRequestWithUser, Friend } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -101,6 +101,16 @@ export function initializeDatabase(): void {
       key TEXT NOT NULL,
       value TEXT NOT NULL,
       PRIMARY KEY (user_id, key)
+    );
+
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      to_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'rejected')),
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(from_user_id, to_user_id)
     );
   `);
 
@@ -1230,5 +1240,179 @@ export function getSummaryStats(userId: number): {
   };
 }
 
+
+// Friend Requests
+export function sendFriendRequest(fromUserId: number, toUserId: number): FriendRequest | { error: string } {
+  // Check if users exist
+  const fromUser = getUserById(fromUserId);
+  const toUser = getUserById(toUserId);
+  if (!fromUser || !toUser) {
+    return { error: 'User not found' };
+  }
+
+  // Can't send request to yourself
+  if (fromUserId === toUserId) {
+    return { error: 'Cannot send friend request to yourself' };
+  }
+
+  // Check if already friends (accepted request in either direction)
+  const existingFriendship = db.prepare(`
+    SELECT * FROM friend_requests
+    WHERE ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))
+      AND status = 'accepted'
+  `).get(fromUserId, toUserId, toUserId, fromUserId) as FriendRequest | undefined;
+
+  if (existingFriendship) {
+    return { error: 'Already friends' };
+  }
+
+  // Check if there's a pending request from the other user
+  const reverseRequest = db.prepare(`
+    SELECT * FROM friend_requests
+    WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'
+  `).get(toUserId, fromUserId) as FriendRequest | undefined;
+
+  if (reverseRequest) {
+    // Auto-accept the reverse request
+    return acceptFriendRequest(reverseRequest.id, fromUserId) as FriendRequest;
+  }
+
+  // Check if there's already a pending request from this user
+  const existingRequest = db.prepare(`
+    SELECT * FROM friend_requests
+    WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'
+  `).get(fromUserId, toUserId) as FriendRequest | undefined;
+
+  if (existingRequest) {
+    return { error: 'Friend request already sent' };
+  }
+
+  // Check if there's a rejected request - allow re-sending
+  const rejectedRequest = db.prepare(`
+    SELECT * FROM friend_requests
+    WHERE from_user_id = ? AND to_user_id = ? AND status = 'rejected'
+  `).get(fromUserId, toUserId) as FriendRequest | undefined;
+
+  if (rejectedRequest) {
+    // Update the rejected request back to pending
+    db.prepare(`
+      UPDATE friend_requests SET status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).run(rejectedRequest.id);
+    return db.prepare('SELECT * FROM friend_requests WHERE id = ?').get(rejectedRequest.id) as FriendRequest;
+  }
+
+  // Create new friend request
+  const result = db.prepare(`
+    INSERT INTO friend_requests (from_user_id, to_user_id) VALUES (?, ?)
+  `).run(fromUserId, toUserId);
+
+  return db.prepare('SELECT * FROM friend_requests WHERE id = ?').get(result.lastInsertRowid) as FriendRequest;
+}
+
+export function acceptFriendRequest(requestId: number, userId: number): FriendRequest | { error: string } {
+  const request = db.prepare('SELECT * FROM friend_requests WHERE id = ?').get(requestId) as FriendRequest | undefined;
+
+  if (!request) {
+    return { error: 'Friend request not found' };
+  }
+
+  // Only the recipient can accept
+  if (request.to_user_id !== userId) {
+    return { error: 'Not authorized to accept this request' };
+  }
+
+  if (request.status !== 'pending') {
+    return { error: 'Request is not pending' };
+  }
+
+  db.prepare(`
+    UPDATE friend_requests SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).run(requestId);
+
+  return db.prepare('SELECT * FROM friend_requests WHERE id = ?').get(requestId) as FriendRequest;
+}
+
+export function rejectFriendRequest(requestId: number, userId: number): FriendRequest | { error: string } {
+  const request = db.prepare('SELECT * FROM friend_requests WHERE id = ?').get(requestId) as FriendRequest | undefined;
+
+  if (!request) {
+    return { error: 'Friend request not found' };
+  }
+
+  // Only the recipient can reject
+  if (request.to_user_id !== userId) {
+    return { error: 'Not authorized to reject this request' };
+  }
+
+  if (request.status !== 'pending') {
+    return { error: 'Request is not pending' };
+  }
+
+  db.prepare(`
+    UPDATE friend_requests SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).run(requestId);
+
+  return db.prepare('SELECT * FROM friend_requests WHERE id = ?').get(requestId) as FriendRequest;
+}
+
+export function getPendingFriendRequests(userId: number): FriendRequestWithUser[] {
+  return db.prepare(`
+    SELECT fr.*,
+           u1.username as from_username,
+           u2.username as to_username
+    FROM friend_requests fr
+    JOIN users u1 ON fr.from_user_id = u1.id
+    JOIN users u2 ON fr.to_user_id = u2.id
+    WHERE fr.to_user_id = ? AND fr.status = 'pending'
+    ORDER BY fr.created_at DESC
+  `).all(userId) as FriendRequestWithUser[];
+}
+
+export function getSentFriendRequests(userId: number): FriendRequestWithUser[] {
+  return db.prepare(`
+    SELECT fr.*,
+           u1.username as from_username,
+           u2.username as to_username
+    FROM friend_requests fr
+    JOIN users u1 ON fr.from_user_id = u1.id
+    JOIN users u2 ON fr.to_user_id = u2.id
+    WHERE fr.from_user_id = ? AND fr.status = 'pending'
+    ORDER BY fr.created_at DESC
+  `).all(userId) as FriendRequestWithUser[];
+}
+
+export function getFriends(userId: number): Friend[] {
+  return db.prepare(`
+    SELECT
+      CASE WHEN fr.from_user_id = ? THEN fr.to_user_id ELSE fr.from_user_id END as user_id,
+      CASE WHEN fr.from_user_id = ? THEN u2.username ELSE u1.username END as username,
+      fr.updated_at as since
+    FROM friend_requests fr
+    JOIN users u1 ON fr.from_user_id = u1.id
+    JOIN users u2 ON fr.to_user_id = u2.id
+    WHERE (fr.from_user_id = ? OR fr.to_user_id = ?) AND fr.status = 'accepted'
+    ORDER BY username
+  `).all(userId, userId, userId, userId) as Friend[];
+}
+
+export function removeFriend(userId: number, friendId: number): boolean {
+  const result = db.prepare(`
+    DELETE FROM friend_requests
+    WHERE ((from_user_id = ? AND to_user_id = ?) OR (from_user_id = ? AND to_user_id = ?))
+      AND status = 'accepted'
+  `).run(userId, friendId, friendId, userId);
+
+  return result.changes > 0;
+}
+
+export function searchUsers(query: string, excludeUserId: number): User[] {
+  return db.prepare(`
+    SELECT id, username, is_admin, created_at
+    FROM users
+    WHERE username LIKE ? AND id != ?
+    ORDER BY username
+    LIMIT 10
+  `).all(`%${query}%`, excludeUserId) as User[];
+}
 
 export { db };

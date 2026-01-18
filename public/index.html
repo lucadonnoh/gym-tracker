@@ -60,10 +60,11 @@
             <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Start Workout</h2>
             <div id="day-buttons" class="bg-surface border border-border rounded-lg overflow-hidden"></div>
           </section>
-          <nav class="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-border">
+          <nav class="grid grid-cols-5 gap-2 mt-6 pt-4 border-t border-border">
             <button onclick="app.showHistory()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">History</button>
             <button onclick="app.showProgress()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Progress</button>
             <button onclick="app.showMeasurements()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Body</button>
+            <button onclick="app.showFriends()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Friends</button>
             <button onclick="app.showManage()" class="flex flex-col items-center gap-1 py-3 px-2 bg-transparent border border-border rounded-lg text-text-secondary text-sm font-medium active:bg-surface">Manage</button>
           </nav>
         </div>
@@ -169,6 +170,38 @@
       <main class="p-4">
         <div id="manage-exercise-list"></div>
         <button id="add-exercise-btn" onclick="app.showAddExercise()" class="w-full p-3 bg-accent text-black font-semibold rounded-lg mt-4">+ Add Exercise</button>
+      </main>
+    </div>
+
+    <!-- Friends Screen -->
+    <div id="friends-screen" class="screen">
+      <header class="bg-black text-text-primary p-4 flex items-center gap-3 sticky top-0 z-10 border-b border-border">
+        <button class="back-btn px-3 py-2 bg-transparent border border-border text-text-secondary rounded-sm text-sm font-medium" onclick="app.goBack()">Back</button>
+        <h1 class="flex-1 text-lg font-semibold">Friends</h1>
+      </header>
+      <main class="p-4">
+        <!-- Add Friend Section -->
+        <section class="mb-6">
+          <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Add Friend</h2>
+          <div class="flex gap-2">
+            <input type="text" id="friend-search-input" placeholder="Search by username..."
+              class="flex-1 p-3 bg-black border border-border rounded-lg text-base text-text-primary focus:outline-none focus:border-accent"
+              oninput="app.searchFriends()">
+          </div>
+          <div id="friend-search-results" class="mt-2"></div>
+        </section>
+
+        <!-- Pending Requests Section -->
+        <section id="pending-requests-section" class="mb-6 hidden">
+          <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Pending Requests</h2>
+          <div id="pending-requests" class="bg-surface border border-border rounded-lg overflow-hidden"></div>
+        </section>
+
+        <!-- Friends List Section -->
+        <section class="mb-6">
+          <h2 class="text-xs uppercase tracking-wider text-text-muted mb-3 font-medium">Your Friends</h2>
+          <div id="friends-list" class="bg-surface border border-border rounded-lg overflow-hidden"></div>
+        </section>
       </main>
     </div>
 

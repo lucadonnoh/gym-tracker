@@ -27,6 +27,7 @@ import { HomeScreen } from './screens/HomeScreen.js';
 import { SessionScreen } from './screens/SessionScreen.js';
 import { ManageDayScreen } from './screens/ManageDayScreen.js';
 import { ProgressDayScreen } from './screens/ProgressDayScreen.js';
+import { FriendsScreen } from './screens/FriendsScreen.js';
 import type { ScreenContext, RouteParams, AppState } from './screens/types.js';
 
 class GymTrackerApp {
@@ -52,7 +53,8 @@ class GymTrackerApp {
     'measurement-detail-screen': '/body/:id',
     'manage-screen': '/manage',
     'manage-day-screen': '/manage/:id',
-    'progress-day-screen': '/progress/:id'
+    'progress-day-screen': '/progress/:id',
+    'friends-screen': '/friends'
   };
 
   // Timers
@@ -140,6 +142,7 @@ class GymTrackerApp {
     this.screenManager.register(new MeasurementDetailScreen(ctx));
     this.screenManager.register(new HomeScreen(ctx));
     this.screenManager.register(new SessionScreen(ctx));
+    this.screenManager.register(new FriendsScreen(ctx));
   }
 
   /**
@@ -812,6 +815,10 @@ class GymTrackerApp {
           // /manage - manage screen (day list)
           await this.showManage();
         }
+        break;
+
+      case 'friends':
+        await this.showFriends();
         break;
 
       default:
@@ -1528,6 +1535,43 @@ class GymTrackerApp {
 
     // Go back to manage screen
     this.goBack();
+  }
+
+  // ===================
+  // Friends
+  // ===================
+
+  async showFriends(): Promise<void> {
+    await this.screenManager.navigateTo('friends-screen');
+  }
+
+  private getFriendsScreen(): FriendsScreen | null {
+    return this.screenManager.get('friends-screen') as FriendsScreen | null;
+  }
+
+  async searchFriends(): Promise<void> {
+    const screen = this.getFriendsScreen();
+    await screen?.searchFriends();
+  }
+
+  async sendFriendRequest(userId: number): Promise<void> {
+    const screen = this.getFriendsScreen();
+    await screen?.sendFriendRequest(userId);
+  }
+
+  async acceptFriendRequest(requestId: number): Promise<void> {
+    const screen = this.getFriendsScreen();
+    await screen?.acceptFriendRequest(requestId);
+  }
+
+  async rejectFriendRequest(requestId: number): Promise<void> {
+    const screen = this.getFriendsScreen();
+    await screen?.rejectFriendRequest(requestId);
+  }
+
+  async removeFriend(friendId: number): Promise<void> {
+    const screen = this.getFriendsScreen();
+    await screen?.removeFriend(friendId);
   }
 
   // ===================
