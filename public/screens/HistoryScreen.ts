@@ -31,7 +31,7 @@ export class HistoryScreen extends BaseScreen {
     // Add workout button + session list
     const addButton = `
       <button id="add-workout-btn" onclick="app.historyScreen_showBackfillModal()"
-        class="w-full p-3 mb-4 bg-primary text-black font-semibold rounded-lg active:bg-primary-dim">
+        class="w-full p-3 mb-4 bg-accent text-black font-semibold rounded-lg active:bg-accent-dim">
         + Add Past Workout
       </button>
     `;
@@ -68,7 +68,7 @@ export class HistoryScreen extends BaseScreen {
           <button onclick="app.historyScreen_hideBackfillModal()"
             class="flex-1 p-3 bg-transparent border border-border text-text-secondary font-medium rounded-lg active:bg-surface-elevated">Cancel</button>
           <button onclick="app.historyScreen_confirmBackfill()"
-            class="flex-1 p-3 bg-primary text-black font-semibold rounded-lg active:bg-primary-dim">Start</button>
+            class="flex-1 p-3 bg-accent text-black font-semibold rounded-lg active:bg-accent-dim">Start</button>
         </div>
       </div>
     `;
