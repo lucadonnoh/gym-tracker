@@ -139,14 +139,17 @@ test.describe('Login Page', () => {
 
     // Should show login screen (token invalid), not black screen
     const screenState = await page.evaluate(() => {
-      const activeScreen = document.querySelector('.screen.active');
-      const allScreens = document.querySelectorAll('.screen');
-      const screensWithActive = Array.from(allScreens).filter(s => s.classList.contains('active'));
+      const screens = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
+      const visibleScreens = screens.filter(id => document.getElementById(id));
+      const active = visibleScreens.length > 0 ? visibleScreens[0] : null;
 
       return {
-        hasActiveScreen: activeScreen !== null,
-        activeScreenId: activeScreen?.id || 'none',
-        screensWithActiveCount: screensWithActive.length,
+        hasActiveScreen: active !== null,
+        activeScreenId: active || 'none',
+        screensWithActiveCount: visibleScreens.length,
         bodyText: document.body.innerText.substring(0, 200)
       };
     });
@@ -183,15 +186,17 @@ test.describe('Login Page', () => {
 
     // Check that we see the home screen, not a black screen
     const screenState = await page.evaluate(() => {
-      const activeScreen = document.querySelector('.screen.active');
-      const loginScreen = document.getElementById('login-screen');
-      const homeScreen = document.getElementById('home-screen');
+      const screens = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
+      const active = screens.find(id => document.getElementById(id));
 
       return {
-        hasActiveScreen: activeScreen !== null,
-        activeScreenId: activeScreen?.id || 'none',
-        loginHasActive: loginScreen?.classList.contains('active') || false,
-        homeHasActive: homeScreen?.classList.contains('active') || false,
+        hasActiveScreen: !!active,
+        activeScreenId: active || 'none',
+        loginVisible: !!document.getElementById('login-screen'),
+        homeVisible: !!document.getElementById('home-screen'),
         bodyText: document.body.innerText.substring(0, 200)
       };
     });
@@ -200,7 +205,7 @@ test.describe('Login Page', () => {
     expect(screenState.hasActiveScreen, `No active screen found! Body text: ${screenState.bodyText}`).toBe(true);
 
     // After login, home screen should be active (not login)
-    expect(screenState.homeHasActive, `Home screen should be active after login. Active: ${screenState.activeScreenId}`).toBe(true);
+    expect(screenState.homeVisible, `Home screen should be visible after login. Active: ${screenState.activeScreenId}`).toBe(true);
 
     expect(jsErrors, `JavaScript errors: ${jsErrors.join(', ')}`).toHaveLength(0);
   });
@@ -223,10 +228,17 @@ test.describe('Login Page', () => {
     await page.waitForTimeout(2000);
 
     // Verify we're on home screen
-    let screenState = await page.evaluate(() => ({
-      activeScreenId: document.querySelector('.screen.active')?.id || 'none',
-      hasToken: localStorage.getItem('gym_tracker_token') !== null
-    }));
+    let screenState = await page.evaluate(() => {
+      const screens = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
+      const active = screens.find(id => document.getElementById(id));
+      return {
+        activeScreenId: active || 'none',
+        hasToken: localStorage.getItem('gym_tracker_token') !== null
+      };
+    });
     expect(screenState.hasToken, 'Should have token after login').toBe(true);
     expect(screenState.activeScreenId, 'Should be on home screen after login').toBe('home-screen');
 
@@ -238,20 +250,24 @@ test.describe('Login Page', () => {
     await page.waitForTimeout(3000);
 
     // Check screen state after refresh
-    screenState = await page.evaluate(() => {
-      const activeScreen = document.querySelector('.screen.active');
+    const refreshState = await page.evaluate(() => {
+      const screens = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
+      const active = screens.find(id => document.getElementById(id));
       return {
-        hasActiveScreen: activeScreen !== null,
-        activeScreenId: activeScreen?.id || 'none',
+        hasActiveScreen: !!active,
+        activeScreenId: active || 'none',
         bodyText: document.body.innerText.substring(0, 300)
       };
     });
 
     // Must have an active screen (not black screen!)
-    expect(screenState.hasActiveScreen, `No active screen after refresh! Body: ${screenState.bodyText}`).toBe(true);
+    expect(refreshState.hasActiveScreen, `No active screen after refresh! Body: ${refreshState.bodyText}`).toBe(true);
 
     // Should show home screen (not login, since token is valid)
-    expect(screenState.activeScreenId, `Expected home-screen after refresh with valid token. Got: ${screenState.activeScreenId}`).toBe('home-screen');
+    expect(refreshState.activeScreenId, `Expected home-screen after refresh with valid token. Got: ${refreshState.activeScreenId}`).toBe('home-screen');
 
     expect(jsErrors, `JavaScript errors: ${jsErrors.join(', ')}`).toHaveLength(0);
   });

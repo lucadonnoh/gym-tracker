@@ -68,7 +68,7 @@ export interface SetGroup {
   reps: number | 'max';
   isDropset: boolean;
   dropsetCount?: number;
-  maxCount?: number; // Number of +max sets to add after the main set(s)
+  maxCount?: number;
   note?: string;
 }
 
@@ -112,8 +112,6 @@ export interface BodyMeasurement {
   notes: string | null;
 }
 
-// Single source of truth for measurement fields
-// Add/remove fields here and they update everywhere (form, display, charts)
 export interface MeasurementFieldConfig {
   key: keyof BodyMeasurement;
   label: string;
@@ -123,18 +121,14 @@ export interface MeasurementFieldConfig {
 }
 
 export const MEASUREMENT_FIELDS: MeasurementFieldConfig[] = [
-  // Main
   { key: 'weight', label: 'Weight', unit: 'kg', color: '#4CAF50', section: 'main' },
-  // Upper body
   { key: 'chest', label: 'Chest', unit: 'cm', color: '#9C27B0', section: 'upper' },
   { key: 'shoulders', label: 'Shoulders', unit: 'cm', color: '#E91E63', section: 'upper' },
   { key: 'neck', label: 'Neck', unit: 'cm', color: '#F44336', section: 'upper' },
   { key: 'left_arm', label: 'Left Arm', unit: 'cm', color: '#00BCD4', section: 'upper' },
   { key: 'right_arm', label: 'Right Arm', unit: 'cm', color: '#009688', section: 'upper' },
-  // Core
   { key: 'waist', label: 'Waist', unit: 'cm', color: '#FF9800', section: 'core' },
   { key: 'hips', label: 'Hips', unit: 'cm', color: '#795548', section: 'core' },
-  // Lower body
   { key: 'left_thigh', label: 'Left Thigh', unit: 'cm', color: '#3F51B5', section: 'lower' },
   { key: 'right_thigh', label: 'Right Thigh', unit: 'cm', color: '#673AB7', section: 'lower' },
   { key: 'left_calf', label: 'Left Calf', unit: 'cm', color: '#607D8B', section: 'lower' },
@@ -163,38 +157,4 @@ export interface Friend {
   user_id: number;
   username: string;
   since: string;
-}
-
-// DOM element refs that we cache
-export interface DOMRefs {
-  // Home screen
-  dayButtons: HTMLElement | null;
-  activeSessionBanner: HTMLElement | null;
-  statsContainer: HTMLElement | null;
-
-  // Session screen
-  sessionDayName: HTMLElement | null;
-  sessionTimer: HTMLElement | null;
-  exerciseList: HTMLElement | null;
-
-  // History screen
-  sessionHistory: HTMLElement | null;
-
-  // Session detail screen
-  detailSessionTitle: HTMLElement | null;
-  sessionDetailContent: HTMLElement | null;
-
-  // Progress screen
-  exerciseSelect: HTMLSelectElement | null;
-  chartsContainer: HTMLElement | null;
-
-  // Manage screen
-  manageDaySelect: HTMLSelectElement | null;
-  manageExerciseList: HTMLElement | null;
-  addExerciseBtn: HTMLElement | null;
-
-  // Modals
-  exerciseModal: HTMLElement | null;
-  restTimerModal: HTMLElement | null;
-  editSetModal: HTMLElement | null;
 }

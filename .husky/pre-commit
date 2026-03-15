@@ -1,5 +1,5 @@
 #!/bin/sh
 
-# Fast checks on commit - TypeScript + unit tests
-npm run build:frontend:ts || exit 1
+# Fast checks on commit - build + unit tests
+npm run build || exit 1
 npm test || exit 1

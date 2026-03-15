@@ -10,6 +10,6 @@
     "rootDir": ".",
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "public/**/*"],
-  "exclude": ["node_modules"]
+  "include": ["src/server.ts", "src/database.ts", "src/seed.ts", "src/types.ts"],
+  "exclude": ["node_modules", "src/frontend"]
 }

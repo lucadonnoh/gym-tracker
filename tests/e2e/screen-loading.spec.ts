@@ -29,7 +29,7 @@ test.describe('Screen Loading', () => {
     await page.fill('#login-username', 'donnoh');
     await page.fill('#login-password', '1234');
     await page.click('#login-submit');
-    await page.waitForSelector('#home-screen.active', { timeout: 5000 });
+    await page.waitForSelector('#home-screen', { timeout: 5000 });
   });
 
   test.afterEach(async () => {
@@ -51,7 +51,7 @@ test.describe('Screen Loading', () => {
 
     // Navigate to History
     await page.locator('#home-screen button:has-text("History")').click();
-    await expect(page.locator('#history-screen')).toHaveClass(/active/, { timeout: 2000 });
+    await expect(page.locator('#history-screen')).toBeVisible({ timeout: 2000 });
 
     // Wait for content to fully load
     await page.waitForTimeout(500);
@@ -69,8 +69,8 @@ test.describe('Screen Loading', () => {
     // Navigate to History
     await page.locator('#home-screen button:has-text("History")').click();
 
-    // Wait for screen to be active
-    await expect(page.locator('#history-screen')).toHaveClass(/active/, { timeout: 2000 });
+    // Wait for screen to be visible
+    await expect(page.locator('#history-screen')).toBeVisible({ timeout: 2000 });
 
     // Content should load within 3 seconds - should NOT still be showing "Loading..."
     await page.waitForTimeout(3000);
@@ -88,12 +88,50 @@ test.describe('Screen Loading', () => {
     expect(html.trim().length).toBeGreaterThan(0);
   });
 
+  test('Add Past Workout button should open backfill modal without errors', async ({ page }) => {
+    // Navigate to History
+    await page.locator('#home-screen button:has-text("History")').click();
+    await expect(page.locator('#history-screen')).toBeVisible({ timeout: 2000 });
+    await page.waitForTimeout(1000);
+
+    // Click the Add Past Workout button
+    const addBtn = page.locator('#add-workout-btn');
+    await expect(addBtn).toBeVisible();
+    await addBtn.click();
+
+    // Modal should appear
+    const modal = page.locator('#backfill-modal');
+    await expect(modal).toBeVisible({ timeout: 2000 });
+
+    // Modal must be a fixed overlay covering the viewport
+    const modalBox = await modal.boundingBox();
+    expect(modalBox).not.toBeNull();
+    const viewport = page.viewportSize()!;
+    expect(modalBox!.x).toBe(0);
+    expect(modalBox!.y).toBe(0);
+    expect(modalBox!.width).toBeGreaterThanOrEqual(viewport.width - 1);
+    expect(modalBox!.height).toBeGreaterThanOrEqual(viewport.height - 1);
+
+    // Date input and day select must be visible within the viewport
+    const dateBox = await page.locator('#backfill-date').boundingBox();
+    const dayBox = await page.locator('#backfill-day').boundingBox();
+    expect(dateBox).not.toBeNull();
+    expect(dayBox).not.toBeNull();
+    expect(dateBox!.y).toBeGreaterThanOrEqual(0);
+    expect(dateBox!.y).toBeLessThan(viewport.height);
+    expect(dayBox!.y).toBeGreaterThanOrEqual(0);
+    expect(dayBox!.y).toBeLessThan(viewport.height);
+
+    // No JS errors should have occurred
+    expect(pageErrors).toHaveLength(0);
+  });
+
   test('Body Measurements screen should load content without JS errors', async ({ page }) => {
     // Navigate to Body Measurements
     await page.locator('#home-screen button:has-text("Body")').click();
 
-    // Wait for screen to be active
-    await expect(page.locator('#measurements-screen')).toHaveClass(/active/, { timeout: 2000 });
+    // Wait for screen to be visible
+    await expect(page.locator('#measurements-screen')).toBeVisible({ timeout: 2000 });
 
     // Content should load within 3 seconds
     await page.waitForTimeout(3000);
@@ -119,8 +157,8 @@ test.describe('Screen Loading', () => {
     // Navigate to Progress
     await page.locator('#home-screen button:has-text("Progress")').click();
 
-    // Wait for screen to be active
-    await expect(page.locator('#progress-screen')).toHaveClass(/active/, { timeout: 2000 });
+    // Wait for screen to be visible
+    await expect(page.locator('#progress-screen')).toBeVisible({ timeout: 2000 });
 
     // Content should load within 3 seconds
     await page.waitForTimeout(3000);
@@ -139,8 +177,8 @@ test.describe('Screen Loading', () => {
     // Navigate to Manage
     await page.locator('#home-screen button:has-text("Manage")').click();
 
-    // Wait for screen to be active
-    await expect(page.locator('#manage-screen')).toHaveClass(/active/, { timeout: 2000 });
+    // Wait for screen to be visible
+    await expect(page.locator('#manage-screen')).toBeVisible({ timeout: 2000 });
 
     // Content should load within 3 seconds
     await page.waitForTimeout(3000);

@@ -21,7 +21,7 @@ test.describe('Navigation', () => {
 
     // Check we're on history screen
     const historyScreen = page.locator('#history-screen');
-    await expect(historyScreen).toHaveClass(/active/);
+    await expect(historyScreen).toBeVisible();
 
     // Click on first history entry (if exists)
     const historyItem = page.locator('.history-item').first();
@@ -31,7 +31,7 @@ test.describe('Navigation', () => {
 
       // Should be on session detail screen
       const detailScreen = page.locator('#session-detail-screen');
-      await expect(detailScreen).toHaveClass(/active/);
+      await expect(detailScreen).toBeVisible();
 
       // Click Back button
       await page.click('#session-detail-screen .back-btn');
@@ -39,11 +39,15 @@ test.describe('Navigation', () => {
 
       // Should NOT be stuck in loading - should show history screen with content
       const screenState = await page.evaluate(() => {
-        const activeScreen = document.querySelector('.screen.active');
+        const screens = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+          'session-detail-screen', 'progress-screen', 'progress-day-screen',
+          'manage-screen', 'manage-day-screen', 'profile-screen',
+          'measurements-screen', 'measurement-detail-screen'];
+        const active = screens.find(id => document.getElementById(id));
         const historyContent = document.querySelector('#session-history')?.innerHTML || '';
         return {
-          activeScreenId: activeScreen?.id || 'none',
-          hasActiveScreen: activeScreen !== null,
+          activeScreenId: active || 'none',
+          hasActiveScreen: !!active,
           historyContent: historyContent,
           isShowingLoading: historyContent.includes('Loading...')
         };

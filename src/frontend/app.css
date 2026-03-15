@@ -60,20 +60,8 @@
 
 /* Component layer for reusable patterns */
 @layer components {
-  /* Screen management - JS toggles .active */
-  .screen {
-    display: none;
-    min-height: 100dvh;
-    flex-direction: column;
-    background: var(--color-black);
-  }
-
-  .screen.active {
-    display: flex;
-  }
-
   /* Modal system */
-  .modal {
+  .modal-backdrop {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.85);
@@ -85,25 +73,8 @@
     backdrop-filter: blur(4px);
   }
 
-  .modal.hidden {
-    display: none;
-  }
-
   .modal-content {
     @apply bg-surface border border-border p-6 rounded-xl w-full max-w-[400px] max-h-[90vh] overflow-y-auto;
-  }
-
-  /* Utility states */
-  .hidden {
-    display: none !important;
-  }
-
-  .loading {
-    visibility: hidden;
-  }
-
-  body.js-loading #app {
-    visibility: hidden;
   }
 
   /* Set group builder in Add Exercise modal */

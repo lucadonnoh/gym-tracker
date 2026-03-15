@@ -31,3 +31,28 @@ This prevents:
 - Fixing symptoms without fixing root cause
 - Tests that pass even when bug exists
 - Regression of the same bug later
+
+## Frontend Architecture: Svelte 5 + Vite
+
+The frontend is built with **Svelte 5** (runes mode) and **Vite**. Each screen is a `.svelte` component in `src/frontend/screens/`.
+
+### Key files
+- `src/frontend/App.svelte` - Root component with screen routing
+- `src/frontend/lib/store.svelte.ts` - Reactive state (`appState`, `router`, `navigate`)
+- `src/frontend/lib/api.ts` - API client (framework-agnostic)
+- `src/frontend/lib/Modal.svelte` - Reusable modal component
+- `src/frontend/lib/types.ts` - Shared TypeScript interfaces
+- `src/frontend/lib/utils.ts` - Helper functions
+- `src/frontend/app.css` - Tailwind CSS + custom theme
+
+### Build
+- `npm run build` - Vite builds to `public/` (served by Express)
+- `npm run dev:frontend` - Vite dev server with HMR (proxies API to port 3000)
+- `npm run dev` - Express backend dev server
+
+### Patterns
+- Screens load data in `onMount` via the API client
+- State is shared via `appState` (Svelte 5 `$state` rune)
+- Navigation uses `navigate(screen, params)` which updates `router` state and `history.pushState`
+- Modals use the `<Modal>` component with `open` boolean prop
+- Screen root elements must have IDs matching e2e test selectors (e.g., `id="home-screen"`)

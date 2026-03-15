@@ -4,18 +4,24 @@ import { test, expect } from '@playwright/test';
 async function setupFlashDetection(page: any) {
   await page.evaluate(() => {
     (window as any).__bgChanges = [];
+    const screenIds = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+      'session-detail-screen', 'progress-screen', 'progress-day-screen',
+      'manage-screen', 'manage-day-screen', 'profile-screen',
+      'measurements-screen', 'measurement-detail-screen'];
     const checkBg = () => {
-      const screens = document.querySelectorAll('.screen');
-      screens.forEach(screen => {
-        const style = window.getComputedStyle(screen);
-        const display = style.display;
-        if (display !== 'none') {
-          (window as any).__bgChanges.push({
-            id: (screen as HTMLElement).id,
-            bg: style.backgroundColor,
-            display,
-            time: performance.now()
-          });
+      screenIds.forEach(id => {
+        const screen = document.getElementById(id);
+        if (screen) {
+          const style = window.getComputedStyle(screen);
+          const display = style.display;
+          if (display !== 'none') {
+            (window as any).__bgChanges.push({
+              id,
+              bg: style.backgroundColor,
+              display,
+              time: performance.now()
+            });
+          }
         }
       });
     };
@@ -108,27 +114,27 @@ test.describe('Workout Screen Transition', () => {
     // Track any visual changes/flashes by monitoring screen visibility
     const flashDetected: string[] = [];
 
-    // Listen for any rapid visibility changes on screens
+    // Listen for any rapid visibility changes on screens (detect DOM additions/removals)
     await page.evaluate(() => {
       (window as any).__screenChanges = [];
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-            const target = mutation.target as HTMLElement;
-            if (target.classList.contains('screen')) {
-              (window as any).__screenChanges.push({
-                id: target.id,
-                classes: target.className,
-                time: performance.now()
-              });
-            }
+      const screenIds = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
+      const observer = new MutationObserver(() => {
+        screenIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            (window as any).__screenChanges.push({
+              id,
+              classes: el.className,
+              time: performance.now()
+            });
           }
         });
       });
 
-      document.querySelectorAll('.screen').forEach(screen => {
-        observer.observe(screen, { attributes: true });
-      });
+      observer.observe(document.body, { childList: true, subtree: true });
     });
 
     // Click the workout day button
@@ -147,11 +153,11 @@ test.describe('Workout Screen Transition', () => {
 
     // Check that we're on the session screen
     const sessionScreen = page.locator('#session-screen');
-    await expect(sessionScreen).toHaveClass(/active/);
+    await expect(sessionScreen).toBeVisible();
 
     // Check the home screen is not visible
     const homeScreen = page.locator('#home-screen');
-    await expect(homeScreen).not.toHaveClass(/active/);
+    await expect(homeScreen).not.toBeVisible();
 
     // Analyze the screen changes - if there are rapid changes, that indicates flashing
     if (screenChanges.length > 2) {
@@ -177,7 +183,7 @@ test.describe('Workout Screen Transition', () => {
     }
 
     // Verify we ended up on session screen
-    await expect(page.locator('#session-screen')).toHaveClass(/active/);
+    await expect(page.locator('#session-screen')).toBeVisible();
   });
 
   test('check for FOUC (flash of unstyled content)', async ({ page }) => {
@@ -186,18 +192,24 @@ test.describe('Workout Screen Transition', () => {
     // Monitor the background color of screens during transition
     await page.evaluate(() => {
       (window as any).__bgChanges = [];
+      const screenIds = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
       const checkBg = () => {
-        const screens = document.querySelectorAll('.screen');
-        screens.forEach(screen => {
-          const style = window.getComputedStyle(screen);
-          const display = style.display;
-          if (display !== 'none') {
-            (window as any).__bgChanges.push({
-              id: (screen as HTMLElement).id,
-              bg: style.backgroundColor,
-              display,
-              time: performance.now()
-            });
+        screenIds.forEach(id => {
+          const screen = document.getElementById(id);
+          if (screen) {
+            const style = window.getComputedStyle(screen);
+            const display = style.display;
+            if (display !== 'none') {
+              (window as any).__bgChanges.push({
+                id,
+                bg: style.backgroundColor,
+                display,
+                time: performance.now()
+              });
+            }
           }
         });
       };
@@ -232,7 +244,7 @@ test.describe('Workout Screen Transition', () => {
     // First start a session
     const dayButton = page.locator('.day-btn').first();
     await dayButton.click();
-    await page.waitForSelector('#session-screen.active');
+    await page.waitForSelector('#session-screen');
 
     // Go back to home (simulating app backgrounding)
     await page.goto('http://localhost:3000');
@@ -255,31 +267,26 @@ test.describe('Workout Screen Transition', () => {
         const exerciseList = document.getElementById('exercise-list');
         const banner = document.getElementById('active-session-banner');
 
-        const sessionActive = sessionScreen?.classList.contains('active');
-        const homeActive = homeScreen?.classList.contains('active');
-        const bannerHidden = banner?.classList.contains('hidden');
+        const sessionVisible = !!sessionScreen;
+        const homeVisible = !!homeScreen;
+        const bannerHidden = banner?.classList.contains('hidden') ?? !banner;
 
         return {
           time: performance.now(),
-          sessionActive,
-          homeActive,
+          sessionActive: sessionVisible,
+          homeActive: homeVisible,
           bannerHidden,
           hasExercises: exerciseList ? exerciseList.children.length > 0 : false
         };
       };
 
-      // Monitor session screen
-      const observer1 = new MutationObserver(() => {
-        (window as any).__contentStates.push(checkState());
+      // Monitor DOM changes for screen additions/removals
+      const observer = new MutationObserver(() => {
+        const state = checkState();
+        (window as any).__contentStates.push(state);
+        (window as any).__bannerStates.push(state);
       });
-      observer1.observe(document.getElementById('session-screen')!, { attributes: true });
-      observer1.observe(document.getElementById('exercise-list')!, { childList: true, subtree: true });
-
-      // Monitor banner
-      const observer2 = new MutationObserver(() => {
-        (window as any).__bannerStates.push(checkState());
-      });
-      observer2.observe(document.getElementById('active-session-banner')!, { attributes: true });
+      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
     });
 
     // Setup flash detection before clicking resume
@@ -304,7 +311,7 @@ test.describe('Workout Screen Transition', () => {
     }
 
     // Verify we're on session screen
-    await expect(page.locator('#session-screen')).toHaveClass(/active/);
+    await expect(page.locator('#session-screen')).toBeVisible();
 
     // Verify exercises are visible
     const exerciseCards = page.locator('#exercise-list .exercise-card');
@@ -343,7 +350,7 @@ test.describe('Workout Screen Transition', () => {
       console.log('FLASH DETECTED on History:', nonBlackBgs);
     }
 
-    await expect(page.locator('#history-screen')).toHaveClass(/active/);
+    await expect(page.locator('#history-screen')).toBeVisible();
     expect(nonBlackBgs.length).toBe(0);
   });
 
@@ -360,7 +367,7 @@ test.describe('Workout Screen Transition', () => {
       console.log('FLASH DETECTED on Progress:', nonBlackBgs);
     }
 
-    await expect(page.locator('#progress-screen')).toHaveClass(/active/);
+    await expect(page.locator('#progress-screen')).toBeVisible();
     expect(nonBlackBgs.length).toBe(0);
   });
 
@@ -376,7 +383,7 @@ test.describe('Workout Screen Transition', () => {
       console.log('FLASH DETECTED on Body:', nonBlackBgs);
     }
 
-    await expect(page.locator('#measurements-screen')).toHaveClass(/active/);
+    await expect(page.locator('#measurements-screen')).toBeVisible();
     expect(nonBlackBgs.length).toBe(0);
   });
 
@@ -392,14 +399,14 @@ test.describe('Workout Screen Transition', () => {
       console.log('FLASH DETECTED on Manage:', nonBlackBgs);
     }
 
-    await expect(page.locator('#manage-screen')).toHaveClass(/active/);
+    await expect(page.locator('#manage-screen')).toBeVisible();
     expect(nonBlackBgs.length).toBe(0);
   });
 
   test('should not flash when going back from any screen', async ({ page }) => {
     // Navigate to History
     await page.locator('.bottom-nav button:has-text("History")').click();
-    await page.waitForSelector('#history-screen.active');
+    await page.waitForSelector('#history-screen');
 
     await setupFlashDetection(page);
 
@@ -413,7 +420,7 @@ test.describe('Workout Screen Transition', () => {
       console.log('FLASH DETECTED on Back:', nonBlackBgs);
     }
 
-    await expect(page.locator('#home-screen')).toHaveClass(/active/);
+    await expect(page.locator('#home-screen')).toBeVisible();
     expect(nonBlackBgs.length).toBe(0);
   });
 });

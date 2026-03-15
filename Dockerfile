@@ -14,8 +14,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build frontend
-RUN npm run build:frontend
+# Build frontend (clean assets first to avoid stale bundles)
+RUN rm -rf public/assets public/index.html && npm run build
 
 # Expose port
 EXPOSE 3000

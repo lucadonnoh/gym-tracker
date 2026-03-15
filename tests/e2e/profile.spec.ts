@@ -11,9 +11,13 @@ test.describe('Profile Screen', () => {
     await page.waitForTimeout(2000);
 
     // Verify we're on home screen
-    const activeScreen = await page.evaluate(() =>
-      document.querySelector('.screen.active')?.id
-    );
+    const activeScreen = await page.evaluate(() => {
+      const screens = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
+      return screens.find(id => document.getElementById(id));
+    });
     expect(activeScreen).toBe('home-screen');
   });
 
@@ -36,9 +40,13 @@ test.describe('Profile Screen', () => {
 
     // Check that profile screen is now active
     const screenState = await page.evaluate(() => {
-      const activeScreen = document.querySelector('.screen.active');
+      const screens = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
+      const active = screens.find(id => document.getElementById(id));
       return {
-        activeScreenId: activeScreen?.id || 'none',
+        activeScreenId: active || 'none',
         url: window.location.pathname
       };
     });
@@ -64,9 +72,13 @@ test.describe('Profile Screen', () => {
     // Wait and verify navigation happened
     await page.waitForTimeout(500);
 
-    const activeScreen = await page.evaluate(() =>
-      document.querySelector('.screen.active')?.id
-    );
+    const activeScreen = await page.evaluate(() => {
+      const screens = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
+      return screens.find(id => document.getElementById(id));
+    });
     expect(activeScreen).toBe('profile-screen');
   });
 
@@ -100,9 +112,13 @@ test.describe('Profile Screen', () => {
     await page.waitForTimeout(1000);
 
     // Check that profile screen is now active
-    const activeScreen = await page.evaluate(() =>
-      document.querySelector('.screen.active')?.id
-    );
+    const activeScreen = await page.evaluate(() => {
+      const screens = ['login-screen', 'home-screen', 'session-screen', 'history-screen',
+        'session-detail-screen', 'progress-screen', 'progress-day-screen',
+        'manage-screen', 'manage-day-screen', 'profile-screen',
+        'measurements-screen', 'measurement-detail-screen'];
+      return screens.find(id => document.getElementById(id));
+    });
 
     expect(activeScreen).toBe('profile-screen');
     expect(jsErrors).toHaveLength(0);

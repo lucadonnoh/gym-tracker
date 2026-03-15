@@ -13,7 +13,7 @@ import type {
   User,
   FriendRequest,
   Friend
-} from './types.js';
+} from './types';
 
 const TOKEN_KEY = 'gym_tracker_token';
 
@@ -311,10 +311,6 @@ class Api {
 
   async deleteMeasurement(id: number): Promise<boolean> {
     return this.delete(`/api/measurements/${id}`);
-  }
-
-  async getMeasurementProgress(): Promise<BodyMeasurement[]> {
-    return this.get('/api/measurements');
   }
 
   // Summary Stats
