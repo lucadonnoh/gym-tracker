@@ -284,17 +284,28 @@ app.get('/api/sessions/active', authMiddleware, (req: AuthRequest, res: Response
 });
 
 app.post('/api/sessions', authMiddleware, (req: AuthRequest, res: Response) => {
-  const { day_id } = req.body;
+  const { day_id, started_at } = req.body;
   if (!day_id) {
     return res.status(400).json({ error: 'day_id is required' });
   }
 
-  const active = getActiveSession(req.user!.id);
-  if (active) {
-    return res.status(400).json({ error: 'An active session already exists', activeSession: active });
+  // Validate started_at if provided
+  if (started_at) {
+    const date = new Date(started_at);
+    if (isNaN(date.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format for started_at' });
+    }
   }
 
-  const session = createSession(day_id, req.user!.id);
+  // Only check for active session if not backdating
+  if (!started_at) {
+    const active = getActiveSession(req.user!.id);
+    if (active) {
+      return res.status(400).json({ error: 'An active session already exists', activeSession: active });
+    }
+  }
+
+  const session = createSession(day_id, req.user!.id, started_at);
   if (!session) return res.status(400).json({ error: 'Invalid day_id' });
   res.status(201).json(session);
 });

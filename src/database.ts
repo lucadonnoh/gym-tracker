@@ -441,11 +441,12 @@ export function reorderExercise(id: number, userId: number, newIndex: number): v
 }
 
 // Sessions
-export function createSession(dayId: number, userId: number): Session | undefined {
+export function createSession(dayId: number, userId: number, startedAt?: string): Session | undefined {
   const day = getDayById(dayId, userId);
   if (!day) return undefined;
 
-  const result = db.prepare('INSERT INTO sessions (user_id, day_id, started_at) VALUES (?, ?, ?)').run(userId, dayId, new Date().toISOString());
+  const timestamp = startedAt || new Date().toISOString();
+  const result = db.prepare('INSERT INTO sessions (user_id, day_id, started_at) VALUES (?, ?, ?)').run(userId, dayId, timestamp);
   return getSessionById(Number(result.lastInsertRowid), userId);
 }
 

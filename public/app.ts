@@ -1098,6 +1098,43 @@ class GymTrackerApp {
 
   // loadHistory() moved to HistoryScreen.enter()
 
+  historyScreen_showBackfillModal(): void {
+    const screen = this.screenManager.get('history-screen') as InstanceType<typeof HistoryScreen>;
+    screen?.showBackfillModal();
+  }
+
+  historyScreen_hideBackfillModal(): void {
+    const screen = this.screenManager.get('history-screen') as InstanceType<typeof HistoryScreen>;
+    screen?.hideBackfillModal();
+  }
+
+  historyScreen_confirmBackfill(): void {
+    const screen = this.screenManager.get('history-screen') as InstanceType<typeof HistoryScreen>;
+    screen?.confirmBackfill();
+  }
+
+  async startBackfillSession(dayId: number, date: string): Promise<void> {
+    try {
+      const startedAt = new Date(date + 'T12:00:00').toISOString();
+      const result = await api.createSession(dayId, startedAt);
+
+      if ('error' in result) {
+        throw new Error(result.error);
+      }
+
+      this.currentSession = result;
+      const day = this.days.find(d => d.id === dayId);
+      if (this.currentSession && day) {
+        this.currentSession.day_display_name = day.display_name;
+      }
+      await this.enterSessionScreen();
+      this.updateUrl('session-screen');
+    } catch (err) {
+      alert('Failed to create session');
+      console.error(err);
+    }
+  }
+
   // ===================
   // Session Detail
   // ===================

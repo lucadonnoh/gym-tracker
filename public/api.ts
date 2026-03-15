@@ -221,11 +221,13 @@ class Api {
     return this.get(`/api/sessions/${id}`);
   }
 
-  async createSession(dayId: number): Promise<Session | { error: string; activeSession?: Session }> {
+  async createSession(dayId: number, startedAt?: string): Promise<Session | { error: string; activeSession?: Session }> {
+    const body: Record<string, unknown> = { day_id: dayId };
+    if (startedAt) body.started_at = startedAt;
     const res = await fetch('/api/sessions', {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ day_id: dayId })
+      body: JSON.stringify(body)
     });
     return this.handleResponse(res);
   }
