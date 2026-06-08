@@ -352,7 +352,8 @@
     historyOpen = true;
 
     try {
-      historyData = await api.getExerciseHistory(exerciseId, 5);
+      // Show the full history for this exercise, not just the most recent few.
+      historyData = await api.getExerciseHistory(exerciseId);
     } catch (error) {
       console.error('Failed to load exercise history:', error);
     }

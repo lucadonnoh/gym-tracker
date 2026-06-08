@@ -199,13 +199,14 @@ class Api {
     return this.get(url);
   }
 
-  async getExerciseHistory(exerciseId: number, limit: number = 5): Promise<{
+  async getExerciseHistory(exerciseId: number, limit?: number): Promise<{
     session_id: number;
     date: string;
     sets: { set_number: number; weight: number; reps: number }[];
     volume: number;
   }[]> {
-    return this.get(`/api/exercises/${exerciseId}/history?limit=${limit}`);
+    const query = limit != null ? `?limit=${limit}` : '';
+    return this.get(`/api/exercises/${exerciseId}/history${query}`);
   }
 
   // Sessions
