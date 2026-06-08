@@ -496,30 +496,26 @@ describe('Database', () => {
       const now = new Date();
       const weeklyGoal = 3;
 
-      // Create 3 sessions last week (complete)
+      // Anchor to Monday of the current week so the 3 "last week" sessions always
+      // land in the SAME (Monday-based) week, regardless of what day the test runs.
+      // Subtracting 7/8/9 days from `now` is fragile: when today is early in the
+      // week, those days straddle a week boundary and split the count (e.g. 1 + 2),
+      // so neither week reaches the goal and the streak wrongly comes out 0.
+      const mondayOffset = (now.getDay() + 6) % 7; // 0 = Monday ... 6 = Sunday
+      const lastWeekMonday = new Date(now);
+      lastWeekMonday.setDate(now.getDate() - mondayOffset - 7);
+
+      // Create 3 sessions last week (complete): Mon, Tue, Wed of last week
       for (let i = 0; i < 3; i++) {
-        const lastWeek = new Date(now);
-        lastWeek.setDate(now.getDate() - 7 - i); // Different days last week
-        createSession(1, 1, lastWeek);
+        const day = new Date(lastWeekMonday);
+        day.setDate(lastWeekMonday.getDate() + i);
+        createSession(1, 1, day);
       }
 
       // Create 1 session this week (incomplete - less than goal of 3)
       createSession(1, 1, now);
 
       const streak = getWeekStreak(1, weeklyGoal);
-
-      // Debug: log the weeks found
-      const weeks = db.prepare(`
-        SELECT
-          strftime('%Y-%W', started_at) as week,
-          COUNT(DISTINCT DATE(started_at)) as workout_days
-        FROM sessions
-        WHERE user_id = 1 AND ended_at IS NOT NULL
-        GROUP BY strftime('%Y-%W', started_at)
-        ORDER BY week DESC
-      `).all();
-      console.log('Weeks found:', weeks);
-      console.log('Current week (ISO):', `${now.getFullYear()}-${String(getWeekNumber(now)).padStart(2, '0')}`);
 
       expect(streak.current).toBe(1); // Last week was complete
       expect(streak.best).toBe(1);
