@@ -69,6 +69,7 @@ export interface SetGroup {
   isDropset: boolean;
   dropsetCount?: number;
   maxCount?: number;
+  bonusReps?: number; // rest-pause add-on reps (e.g. the "+5" in 10+5)
   note?: string;
 }
 

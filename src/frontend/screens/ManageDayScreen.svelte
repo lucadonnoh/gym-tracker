@@ -155,6 +155,13 @@
     }
   }
 
+  function updateBonusReps(index: number, value: string) {
+    const num = parseInt(value);
+    if (!isNaN(num) && num >= 0) {
+      setGroups[index].bonusReps = num || undefined;
+    }
+  }
+
   // Rename day
   function openRenameModal() {
     renameValue = dayTitle;
@@ -344,6 +351,19 @@
                   value={group.dropsetCount ?? 2}
                   oninput={(e) => updateDropsetCount(index, (e.target as HTMLInputElement).value)}
                   min="2"
+                />
+              </div>
+            {/if}
+            {#if group.reps !== 'max'}
+              <div class="flex items-center gap-1">
+                <span class="option-label">+reps:</span>
+                <input
+                  type="number"
+                  class="option-input"
+                  value={group.bonusReps ?? 0}
+                  oninput={(e) => updateBonusReps(index, (e.target as HTMLInputElement).value)}
+                  min="0"
+                  title="Rest-pause add-on reps (e.g. the +5 in 10+5)"
                 />
               </div>
             {/if}
