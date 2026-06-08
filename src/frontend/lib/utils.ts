@@ -33,11 +33,21 @@ export function parseSetScheme(description: string | null): ParsedSet[] {
   const parts = description.split(',').map(p => p.trim());
 
   for (const part of parts) {
-    const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)((?:\+max)*)/i);
+    const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)((?:\+(?:\d+|max))*)/i);
     if (match) {
       const count = parseInt(match[1]);
       const repsStr = match[2].toLowerCase();
-      const maxSuffix = match[3] || '';
+      const suffix = match[3] || '';
+
+      // Add-ons after the base reps, e.g. "+5" or "+max" (rest-pause / cluster sets).
+      // Numeric add-ons (e.g. 10+5) are extra reps done after a short rest within the
+      // SAME set, so they fold into that set's rep total (10+5 = 15 reps per set).
+      // "+max" add-ons stay as separate max sets (existing behaviour).
+      const addons = suffix.match(/\+(?:\d+|max)/gi) || [];
+      const bonusReps = addons
+        .filter(a => /^\+\d+$/.test(a))
+        .reduce((sum, a) => sum + parseInt(a.slice(1)), 0);
+      const maxCount = addons.filter(a => /max/i.test(a)).length;
 
       if (repsStr === 'max') {
         for (let i = 0; i < count; i++) {
@@ -49,17 +59,14 @@ export function parseSetScheme(description: string | null): ParsedSet[] {
           sets.push({ setNumber: setNumber++, reps: repsStr, isDropset: true, dropsetParts });
         }
       } else {
-        const reps = parseInt(repsStr);
+        const reps = parseInt(repsStr) + bonusReps;
         for (let i = 0; i < count; i++) {
           sets.push({ setNumber: setNumber++, reps, isDropset: false });
         }
       }
 
-      if (maxSuffix) {
-        const maxCount = (maxSuffix.match(/\+max/gi) || []).length;
-        for (let i = 0; i < maxCount; i++) {
-          sets.push({ setNumber: setNumber++, reps: 'max', isDropset: false });
-        }
+      for (let i = 0; i < maxCount; i++) {
+        sets.push({ setNumber: setNumber++, reps: 'max', isDropset: false });
       }
     }
   }
@@ -82,11 +89,16 @@ export function parseDescriptionToGroups(description: string | null): SetGroup[]
   const parts = description.split(',').map(p => p.trim());
 
   for (const part of parts) {
-    const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)((?:\+max)*)/i);
+    const match = part.match(/(\d+)\s*x\s*(\d+(?:-\d+)*|max)((?:\+(?:\d+|max))*)/i);
     if (match) {
       const count = parseInt(match[1]);
       const repsStr = match[2].toLowerCase();
-      const maxSuffix = match[3] || '';
+      const suffix = match[3] || '';
+      const addons = suffix.match(/\+(?:\d+|max)/gi) || [];
+      const bonusReps = addons
+        .filter(a => /^\+\d+$/.test(a))
+        .reduce((sum, a) => sum + parseInt(a.slice(1)), 0);
+      const maxCount = addons.filter(a => /max/i.test(a)).length;
 
       let group: SetGroup;
       if (repsStr === 'max') {
@@ -99,11 +111,11 @@ export function parseDescriptionToGroups(description: string | null): SetGroup[]
         group = { count, reps: parseInt(repsStr), isDropset: false };
       }
 
-      if (maxSuffix) {
-        const maxCount = (maxSuffix.match(/\+max/gi) || []).length;
-        if (maxCount > 0) {
-          group.maxCount = maxCount;
-        }
+      if (bonusReps > 0) {
+        group.bonusReps = bonusReps;
+      }
+      if (maxCount > 0) {
+        group.maxCount = maxCount;
       }
 
       const noteMatch = part.match(/\(([^)]+)\)/);
@@ -130,6 +142,10 @@ export function generateDescription(setGroups: SetGroup[]): string {
     }
 
     let part = `${group.count}x${repsStr}`;
+
+    if (group.bonusReps && group.bonusReps > 0 && group.reps !== 'max') {
+      part += `+${group.bonusReps}`;
+    }
 
     if (group.maxCount && group.maxCount > 0) {
       part += '+max'.repeat(group.maxCount);
