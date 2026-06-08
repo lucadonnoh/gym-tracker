@@ -658,8 +658,9 @@ export function getAllExercises(userId: number): (Exercise & { day_display_name:
   `).all(userId) as (Exercise & { day_display_name: string })[];
 }
 
-// Get recent session history for a specific exercise
-export function getExerciseHistory(exerciseId: number, userId: number, limit: number = 5): {
+// Get session history for a specific exercise.
+// By default returns ALL past sessions; pass a positive `limit` to cap the count.
+export function getExerciseHistory(exerciseId: number, userId: number, limit?: number): {
   session_id: number;
   date: string;
   sets: { set_number: number; weight: number; reps: number }[];
@@ -668,7 +669,9 @@ export function getExerciseHistory(exerciseId: number, userId: number, limit: nu
   const exercise = getExerciseById(exerciseId, userId);
   if (!exercise) return [];
 
-  // Get recent sessions that have this exercise
+  // Get sessions that have this exercise. Only apply a LIMIT when one is requested,
+  // so the full history is shown by default (never truncate workout info).
+  const applyLimit = limit != null && limit > 0;
   const sessions = db.prepare(`
     SELECT DISTINCT s.id, s.started_at
     FROM sessions s
@@ -676,8 +679,8 @@ export function getExerciseHistory(exerciseId: number, userId: number, limit: nu
     JOIN set_logs sl ON sl.session_exercise_id = se.id
     WHERE se.exercise_id = ? AND s.user_id = ? AND s.ended_at IS NOT NULL
     ORDER BY s.started_at DESC
-    LIMIT ?
-  `).all(exerciseId, userId, limit) as { id: number; started_at: string }[];
+    ${applyLimit ? 'LIMIT ?' : ''}
+  `).all(...(applyLimit ? [exerciseId, userId, limit] : [exerciseId, userId])) as { id: number; started_at: string }[];
 
   return sessions.map(session => {
     const sets = db.prepare(`

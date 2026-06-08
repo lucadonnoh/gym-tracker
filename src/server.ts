@@ -395,9 +395,9 @@ app.get('/api/progress/:exerciseId', authMiddleware, (req: AuthRequest, res: Res
   res.json(getExerciseProgress(Number(req.params.exerciseId), req.user!.id));
 });
 
-// Exercise history (last N sessions for a specific exercise)
+// Exercise history (all past sessions for a specific exercise, or last N if limit given)
 app.get('/api/exercises/:exerciseId/history', authMiddleware, (req: AuthRequest, res: Response) => {
-  const limit = req.query.limit ? Number(req.query.limit) : 5;
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
   res.json(getExerciseHistory(Number(req.params.exerciseId), req.user!.id, limit));
 });
 
