@@ -17,6 +17,9 @@ COPY . .
 # Build frontend (clean assets first to avoid stale bundles)
 RUN rm -rf public/assets public/index.html && npm run build
 
+# The server runs with tsx; drop build and test tooling from the runtime image
+RUN npm prune --omit=dev
+
 # Expose port
 EXPOSE 3000
 
