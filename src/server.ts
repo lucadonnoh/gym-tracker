@@ -67,7 +67,12 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'gym-tracker-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET ?? '';
+if (!JWT_SECRET) {
+  // A built-in fallback would let anyone who has read this source forge login tokens.
+  console.error('JWT_SECRET is not set; refusing to start.');
+  process.exit(1);
+}
 const JWT_EXPIRY = '30d';
 
 // Extend Express Request to include user
